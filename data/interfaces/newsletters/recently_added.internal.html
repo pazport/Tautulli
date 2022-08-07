@@ -26,7 +26,6 @@
     <meta name="viewport" content="width=device-width"/>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <title>Tautulli Newsletter - ${subject}</title>
-    <link rel="shortcut icon" href="${base_url_image + 'images/favicon/favicon.ico' if base_url_image else 'https://tautulli.com/images/favicon.ico'}">
     <style>
         /* -------------------------------------
             GLOBAL RESETS
@@ -521,7 +520,7 @@
                 line-height: 100%;
             }
 
-            a[x-apple-data-detectors] {
+            .apple-link a {
                 color: inherit !important;
                 font-family: inherit !important;
                 font-size: inherit !important;
@@ -546,7 +545,7 @@
                 <span class="preheader">Tautulli Newsletter  - ${subject}</span>
                 % if base_url and not preview:
                 <div class="view-full">  <!-- IGNORE SAVE -->
-                    <a href="${base_url + uuid}" title="View full newsletter" target="_blank" rel="noreferrer">Click here to view the full newsletter.</a>  <!-- IGNORE SAVE -->
+                    <a href="${base_url + uuid}" title="View full newsletter" target="_blank">Click here to view the full newsletter.</a>  <!-- IGNORE SAVE -->
                 </div>  <!-- IGNORE SAVE -->
                 % endif
                 <table border="0" cellpadding="3" cellspacing="0" class="main">
@@ -599,7 +598,7 @@
                                                                 <table border="0" cellpadding="0" cellspacing="0" class="card-poster" style="background-image: url(${(base_url_image + movie['thumb_hash']) if base_url_image else movie['thumb_url']})">
                                                                     <tr>
                                                                         <td>
-                                                                            <a href="${parameters['pms_web_url']}#!/server/${parameters['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${movie['rating_key']}" title="${movie['title']}" target="_blank" rel="noreferrer">
+                                                                            <a href="${movie['pms_web_url']}#!/server/${movie['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${movie['rating_key']}" title="${movie['title']}" target="_blank">
                                                                                 <img class="card-poster-overlay" src="${base_url_image + 'images/newsletter/view-on-plex-poster.png' if base_url_image else 'https://tautulli.com/images/newsletter/view-on-plex-poster.png'}" width="150" height="225">
                                                                             </a>
                                                                         </td>
@@ -610,7 +609,7 @@
                                                                 <table border="0" cellpadding="0" cellspacing="0" class="card-info-container-table">
                                                                     <tr>
                                                                         <td class="card-info-title nowrap">
-                                                                            <a href="${parameters['pms_web_url']}#!/server/${parameters['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${movie['rating_key']}" title="${movie['title']}" target="_blank" rel="noreferrer">${movie['title']}</a>
+                                                                            <a href="${movie['pms_web_url']}#!/server/${movie['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${movie['rating_key']}" title="${movie['title']}" target="_blank">${movie['title']}</a>
                                                                         </td>
                                                                     </tr>
                                                                     <tr>
@@ -647,9 +646,9 @@
                                                                                             </tr>
                                                                                         </table>
                                                                                     </td>
-                                                                                    % if movie['rating'] or movie['audience_rating']:
-                                                                                    <% rating = int(round(float(movie['rating'] or movie['audience_rating']) / 2)) %>
-                                                                                    <td class="star-rating-container" title="${int(float(movie['rating'] or movie['audience_rating'])/0.1)}%" align="right">
+                                                                                    % if movie['rating']:
+                                                                                    <% rating = int(round(float(movie['rating']) / 2)) %>
+                                                                                    <td class="star-rating-container" title="${int(float(movie['rating'])/0.1)}%" align="right">
                                                                                         <table border="0" cellpadding="0" cellspacing="0">
                                                                                             <tr>
                                                                                                 % for _ in range(rating):
@@ -728,7 +727,7 @@
                                                                 <table border="0" cellpadding="0" cellspacing="0" class="card-poster" style="background-image: url(${(base_url_image + show['thumb_hash']) if base_url_image else show['thumb_url']})">
                                                                     <tr>
                                                                         <td>
-                                                                            <a href="${parameters['pms_web_url']}#!/server/${parameters['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${link_rating_key}" title="${show['title']}" target="_blank" rel="noreferrer">
+                                                                            <a href="${show['pms_web_url']}#!/server/${show['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${link_rating_key}" title="${show['title']}" target="_blank">
                                                                                 <img class="card-poster-overlay" src="${base_url_image + 'images/newsletter/view-on-plex-poster.png' if base_url_image else 'https://tautulli.com/images/newsletter/view-on-plex-poster.png'}" width="150" height="225">
                                                                             </a>
                                                                         </td>
@@ -739,7 +738,7 @@
                                                                 <table border="0" cellpadding="0" cellspacing="0" class="card-info-container-table">
                                                                     <tr>
                                                                         <td class="card-info-title nowrap">
-                                                                            <a href="${parameters['pms_web_url']}#!/server/${parameters['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${link_rating_key}" title="${show['title']}" target="_blank" rel="noreferrer">${show['title']}</a>
+                                                                            <a href="${show['pms_web_url']}#!/server/${show['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${link_rating_key}" title="${show['title']}" target="_blank">${show['title']}</a>
                                                                         </td>
                                                                     </tr>
                                                                     <tr>
@@ -754,9 +753,9 @@
                                                                             <p class="nowrap mb5">
                                                                                 % for i, season in enumerate(show['season'][:8]):
                                                                                     % if season['episode_count'] == 1:
-                                                                                        ${season['title']} &middot; Episode ${season['episode'][0]['media_index']} - ${season['episode'][0]['title']}
+                                                                                        Season ${season['media_index']} &middot; Episode ${season['episode'][0]['media_index']} - ${season['episode'][0]['title']}
                                                                                     % else:
-                                                                                        ${season['title']} &middot; Episodes ${season['episode_range']}
+                                                                                        Season ${season['media_index']} &middot; Episodes ${season['episode_range']}
                                                                                     % endif
                                                                                     % if i < min(show['season_count'], 7):
                                                                                         <br>
@@ -800,9 +799,9 @@
                                                                                             </tr>
                                                                                         </table>
                                                                                     </td>
-                                                                                    % if show['rating'] or show['audience_rating']:
-                                                                                    <% rating = int(round(float(show['rating'] or show['audience_rating']) / 2)) %>
-                                                                                    <td class="star-rating-container" title="${int(float(show['rating'] or show['audience_rating'])/0.1)}%" align="right">
+                                                                                    % if show['rating']:
+                                                                                    <% rating = int(round(float(show['rating']) / 2)) %>
+                                                                                    <td class="star-rating-container" title="${int(float(show['rating'])/0.1)}%" align="right">
                                                                                         <table border="0" cellpadding="0" cellspacing="0">
                                                                                             <tr>
                                                                                                 % for _ in range(rating):
@@ -872,7 +871,7 @@
                                                                 <table border="0" cellpadding="0" cellspacing="0" class="card-poster" style="background-image: url(${(base_url_image + album['thumb_hash']) if base_url_image else album['thumb_url']})">
                                                                     <tr>
                                                                         <td>
-                                                                            <a href="${parameters['pms_web_url']}#!/server/${parameters['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${album['rating_key']}" title="${album['title']}" target="_blank" rel="noreferrer">
+                                                                            <a href="${album['pms_web_url']}#!/server/${album['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${album['rating_key']}" title="${album['title']}" target="_blank">
                                                                                 <img class="card-poster-overlay" src="${base_url_image + 'images/newsletter/view-on-plex-cover.png' if base_url_image else 'https://tautulli.com/images/newsletter/view-on-plex-cover.png'}" width="150" height="150">
                                                                             </a>
                                                                         </td>
@@ -883,7 +882,7 @@
                                                                 <table border="0" cellpadding="0" cellspacing="0" class="card-info-container-table">
                                                                     <tr>
                                                                         <td class="card-info-title nowrap">
-                                                                            <a href="${parameters['pms_web_url']}#!/server/${parameters['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${album['rating_key']}" title="${album['title']}" target="_blank" rel="noreferrer">${album['title']}</a>
+                                                                            <a href="${album['pms_web_url']}#!/server/${album['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${album['rating_key']}" title="${album['title']}" target="_blank">${album['title']}</a>
                                                                         </td>
                                                                     </tr>
                                                                     <tr>
@@ -916,9 +915,9 @@
                                                                                             </tr>
                                                                                         </table>
                                                                                     </td>
-                                                                                    % if album['rating'] or album['audience_rating']:
-                                                                                    <% rating = int(round(float(album['rating'] or album['audience_rating']) / 2)) %>
-                                                                                    <td class="star-rating-container" title="${int(float(album['rating'] or album['audience_rating'])/0.1)}%" align="right">
+                                                                                    % if album['rating']:
+                                                                                    <% rating = int(round(float(album['rating']) / 2)) %>
+                                                                                    <td class="star-rating-container" title="${int(float(album['rating'])/0.1)}%" align="right">
                                                                                         <table border="0" cellpadding="0" cellspacing="0">
                                                                                             <tr>
                                                                                                 % for _ in range(rating):
@@ -986,7 +985,7 @@
                                                                 <table border="0" cellpadding="0" cellspacing="0" class="card-poster" style="background-image: url(${(base_url_image + video['thumb_hash']) if base_url_image else video['thumb_url']})">
                                                                     <tr>
                                                                         <td>
-                                                                            <a href="${parameters['pms_web_url']}#!/server/${parameters['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${video['rating_key']}" title="${video['title']}" target="_blank" rel="noreferrer">
+                                                                            <a href="${video['pms_web_url']}#!/server/${video['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${video['rating_key']}" title="${video['title']}" target="_blank">
                                                                                 <img class="card-poster-overlay" src="${base_url_image + 'images/newsletter/view-on-plex-poster.png' if base_url_image else 'https://tautulli.com/images/newsletter/view-on-plex-poster.png'}" width="150" height="225">
                                                                             </a>
                                                                         </td>
@@ -997,7 +996,7 @@
                                                                 <table border="0" cellpadding="0" cellspacing="0" class="card-info-container-table">
                                                                     <tr>
                                                                         <td class="card-info-title nowrap">
-                                                                            <a href="${parameters['pms_web_url']}#!/server/${parameters['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${video['rating_key']}" title="${video['title']}" target="_blank" rel="noreferrer">${video['title']}</a>
+                                                                            <a href="${video['pms_web_url']}#!/server/${video['pms_identifier']}/details?key=%2Flibrary%2Fmetadata%2F${video['rating_key']}" title="${video['title']}" target="_blank">${video['title']}</a>
                                                                         </td>
                                                                     </tr>
                                                                     <tr>
@@ -1034,9 +1033,9 @@
                                                                                             </tr>
                                                                                         </table>
                                                                                     </td>
-                                                                                    % if video['rating'] or video['audience_rating']:
-                                                                                    <% rating = int(round(float(video['rating'] or video['audience_rating']) / 2)) %>
-                                                                                    <td class="star-rating-container" title="${int(float(video['rating'] or video['audience_rating'])/0.1)}%" align="right">
+                                                                                    % if video['rating']:
+                                                                                    <% rating = int(round(float(video['rating']) / 2)) %>
+                                                                                    <td class="star-rating-container" title="${int(float(video['rating'])/0.1)}%" align="right">
                                                                                         <table border="0" cellpadding="0" cellspacing="0">
                                                                                             <tr>
                                                                                                 % for _ in range(rating):

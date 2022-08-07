@@ -38,7 +38,6 @@ load_rc_config ${name}
 status_cmd="${name}_status"
 stop_cmd="${name}_stop"
 
-command_interpreter="python"
 command="${tautulli_dir}/Tautulli.py"
 command_args="--daemon --pidfile ${tautulli_pid} --quiet --nolaunch ${tautulli_flags}"
 
@@ -52,7 +51,7 @@ verify_tautulli_pid() {
     # Make sure the pid corresponds to the Tautulli process.
     if [ -f ${tautulli_pid} ]; then
       pid=`cat ${tautulli_pid} 2>/dev/null`
-      ps -p ${pid} | grep -q "python ${tautulli_dir}/Tautulli.py"
+      ps -p ${pid} | grep -q "python2 ${tautulli_dir}/Tautulli.py"
       return $?
     else
       return 0
@@ -61,7 +60,7 @@ verify_tautulli_pid() {
 
 # Try to stop Tautulli cleanly by sending SIGTERM
 tautulli_stop() {
-    echo "Stopping $name."
+    echo "Stopping $name"
     verify_tautulli_pid
     if [ -n "${pid}" ]; then
       kill ${pid}

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Parameter check
 if [ -z "$1" ]; then

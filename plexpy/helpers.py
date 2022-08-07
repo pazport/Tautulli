@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-
-#  This file is part of Tautulli.
+﻿#  This file is part of Tautulli.
 #
 #  Tautulli is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -15,54 +13,40 @@
 #  You should have received a copy of the GNU General Public License
 #  along with Tautulli.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import division
-from __future__ import unicode_literals
-
-from future.builtins import zip
-from future.builtins import str
-
-import arrow
 import base64
 import cloudinary
 from cloudinary.api import delete_resources_by_tag
 from cloudinary.uploader import upload
 from cloudinary.utils import cloudinary_url
-from collections import OrderedDict
 import datetime
-from functools import reduce, wraps
+from functools import wraps
+import geoip2.database, geoip2.errors
+import gzip
 import hashlib
 import imghdr
-from future.moves.itertools import islice, zip_longest
-import ipwhois
-import ipwhois.exceptions
-import ipwhois.utils
+from itertools import zip_longest
+import ipwhois, ipwhois.exceptions, ipwhois.utils
 from IPy import IP
 import json
 import math
-import operator
+import maxminddb
+from operator import itemgetter
 import os
 import re
 import shlex
 import socket
-import string
 import sys
 import time
 import unicodedata
-from future.moves.urllib.parse import urlencode
+import urllib.parse
+import urllib.request
 from xml.dom import minidom
 import xmltodict
 
 import plexpy
-if plexpy.PYTHON2:
-    import common
-    import logger
-    import request
-    from api2 import API2
-else:
-    from plexpy import common
-    from plexpy import logger
-    from plexpy import request
-    from plexpy.api2 import API2
+from plexpy import logger
+from plexpy import request
+from plexpy.api2 import API2
 
 
 def addtoapi(*dargs, **dkwargs):
@@ -98,6 +82,31 @@ def addtoapi(*dargs, **dkwargs):
 
     return rd
 
+def cmp(x, y):
+    """
+    Replacement for built-in function cmp that was removed in Python 3
+
+    Compare the two objects x and y and return an integer according to
+    the outcome. The return value is negative if x < y, zero if x == y
+    and strictly positive if x > y.
+    """
+
+    return (x > y) - (x < y)
+
+
+def multikeysort(items, columns):
+    comparers = [((itemgetter(col[1:].strip()), -1) if col.startswith('-') else (itemgetter(col.strip()), 1)) for col in columns]
+
+    def comparer(left, right):
+        for fn, mult in comparers:
+            result = cmp(fn(left), fn(right))
+            if result:
+                return mult * result
+        else:
+            return 0
+
+    return sorted(items, key=comparer)
+
 
 def checked(variable):
     if variable:
@@ -114,7 +123,7 @@ def radio(variable, pos):
         return ''
 
 
-def latinToAscii(unicrap, replace=False):
+def latinToAscii(unicrap):
     """
     From couch potato
     """
@@ -152,8 +161,7 @@ def latinToAscii(unicrap, replace=False):
             if ord(i) in xlate:
                 r += xlate[ord(i)]
             elif ord(i) >= 0x80:
-                if replace:
-                    r += '?'
+                pass
             else:
                 r += str(i)
 
@@ -162,7 +170,7 @@ def latinToAscii(unicrap, replace=False):
 
 def convert_milliseconds(ms):
 
-    seconds = ms // 1000
+    seconds = ms / 1000
     gmtime = time.gmtime(seconds)
     if seconds > 3600:
         minutes = time.strftime("%H:%M:%S", gmtime)
@@ -172,25 +180,14 @@ def convert_milliseconds(ms):
     return minutes
 
 
-def convert_milliseconds_to_seconds(ms):
-    if str(ms).isdigit():
-        seconds = float(ms) / 1000
-        return math.trunc(seconds)
-    return 0
-
-
 def convert_milliseconds_to_minutes(ms):
+
     if str(ms).isdigit():
         seconds = float(ms) / 1000
         minutes = round(seconds / 60, 0)
-        return math.trunc(minutes)
-    return 0
 
-
-def seconds_to_minutes(s):
-    if str(s).isdigit():
-        minutes = round(s / 60, 0)
         return math.trunc(minutes)
+
     return 0
 
 
@@ -215,15 +212,17 @@ def convert_seconds_to_minutes(s):
     return 0
 
 
-def timestamp():
-    return int(time.time())
-
-
 def today():
     today = datetime.date.today()
     yyyymmdd = datetime.date.isoformat(today)
 
     return yyyymmdd
+
+
+def now():
+    now = datetime.datetime.now()
+
+    return now.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def utc_now_iso():
@@ -232,84 +231,37 @@ def utc_now_iso():
     return utcnow.isoformat()
 
 
-def now(sep=False):
-    return timestamp_to_YMDHMS(timestamp(), sep=sep)
+def human_duration(s, sig='dhms'):
 
+    hd = ''
 
-def timestamp_to_YMDHMS(ts, sep=False):
-    dt = timestamp_to_datetime(ts)
-    if sep:
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
-    return dt.strftime("%Y%m%d%H%M%S")
-
-
-def timestamp_to_datetime(ts):
-    return datetime.datetime.fromtimestamp(ts)
-
-
-def iso_to_YMD(iso):
-    return iso_to_datetime(iso).strftime("%Y-%m-%d")
-
-
-def iso_to_datetime(iso):
-    return arrow.get(iso).datetime
-
-
-def datetime_to_iso(dt, to_date=False):
-    if isinstance(dt, datetime.datetime):
-        if to_date:
-            dt = dt.date()
-        return dt.isoformat()
-    return dt
-
-
-def human_duration(ms, sig='dhm', units='ms', return_seconds=300000):
-    factors = {'d': 86400000,
-               'h': 3600000,
-               'm': 60000,
-               's': 1000,
-               'ms': 1}
-
-    if str(ms).isdigit() and ms > 0:
-        if return_seconds and ms < return_seconds:
-            sig = 'dhms'
-
-        ms = ms * factors[units]
-
-        d, h = divmod(ms, factors['d'])
-        h, m = divmod(h, factors['h'])
-        m, s = divmod(m, factors['m'])
-        s, ms = divmod(s, factors['s'])
+    if str(s).isdigit() and s > 0:
+        d = int(s / 86400)
+        h = int((s % 86400) / 3600)
+        m = int(((s % 86400) % 3600) / 60)
+        s = int(((s % 86400) % 3600) % 60)
 
         hd_list = []
         if sig >= 'd' and d > 0:
             d = d + 1 if sig == 'd' and h >= 12 else d
-            hd_list.append(str(d) + ' day' + ('s' if d > 1 else ''))
+            hd_list.append(str(d) + ' days')
 
         if sig >= 'dh' and h > 0:
             h = h + 1 if sig == 'dh' and m >= 30 else h
-            hd_list.append(str(h) + ' hr' + ('s' if h > 1 else ''))
+            hd_list.append(str(h) + ' hrs')
 
         if sig >= 'dhm' and m > 0:
             m = m + 1 if sig == 'dhm' and s >= 30 else m
-            hd_list.append(str(m) + ' min' + ('s' if m > 1 else ''))
+            hd_list.append(str(m) + ' mins')
 
         if sig >= 'dhms' and s > 0:
-            hd_list.append(str(s) + ' sec' + ('s' if s > 1 else ''))
+            hd_list.append(str(s) + ' secs')
 
         hd = ' '.join(hd_list)
     else:
         hd = '0'
 
     return hd
-
-
-def format_timedelta_Hms(td):
-    s = td.total_seconds()
-    hours = s // 3600
-    minutes = (s % 3600) // 60
-    seconds = s % 60
-    return '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
 
 
 def get_age(date):
@@ -329,7 +281,7 @@ def get_age(date):
 
 def bytes_to_mb(bytes):
 
-    mb = float(bytes) / 1048576
+    mb = int(bytes) / 1048576
     size = '%.1f MB' % mb
     return size
 
@@ -412,17 +364,6 @@ def cleanTitle(title):
     return title
 
 
-def clean_filename(filename, replace='_'):
-    whitelist = "-_.()[] {}{}".format(string.ascii_letters, string.digits)
-    cleaned_filename = unicodedata.normalize('NFKD', filename).encode('ASCII', 'ignore').decode()
-    cleaned_filename = ''.join(c if c in whitelist else replace for c in cleaned_filename)
-    return cleaned_filename
-
-
-def split_strip(s, delimiter=','):
-    return [x.strip() for x in str(s).split(delimiter) if x.strip()]
-
-
 def split_path(f):
     """
     Split a path into components, starting with the drive letter (if any). Given
@@ -483,32 +424,25 @@ def create_https_certificates(ssl_cert, ssl_key):
 
     This code is stolen from SickBeard (http://github.com/midgetspy/Sick-Beard).
     """
-    try:
-        from OpenSSL import crypto
-    except ImportError:
-        logger.error("Unable to generate self-signed certificates: Missing OpenSSL module.")
-        return False
+    from OpenSSL import crypto
     from certgen import createKeyPair, createSelfSignedCertificate, TYPE_RSA
 
-    issuer = common.PRODUCT
-    serial = timestamp()
-    not_before = 0
-    not_after = 60 * 60 * 24 * 365 * 10  # ten years
+    serial = int(time.time())
     domains = ['DNS:' + d.strip() for d in plexpy.CONFIG.HTTPS_DOMAIN.split(',') if d]
     ips = ['IP:' + d.strip() for d in plexpy.CONFIG.HTTPS_IP.split(',') if d]
-    alt_names = ','.join(domains + ips).encode('utf-8')
+    altNames = ','.join(domains + ips)
 
     # Create the self-signed Tautulli certificate
-    logger.debug("Generating self-signed SSL certificate.")
+    logger.debug(u"Generating self-signed SSL certificate.")
     pkey = createKeyPair(TYPE_RSA, 2048)
-    cert = createSelfSignedCertificate(issuer, pkey, serial, not_before, not_after, alt_names)
+    cert = createSelfSignedCertificate(("Tautulli", pkey), serial, (0, 60 * 60 * 24 * 365 * 10), altNames) # ten years
 
     # Save the key and certificate to disk
     try:
         with open(ssl_cert, "w") as fp:
-            fp.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode('utf-8'))
+            fp.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
         with open(ssl_key, "w") as fp:
-            fp.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey).decode('utf-8'))
+            fp.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey))
     except IOError as e:
         logger.error("Error creating SSL key and certificate: %s", e)
         return False
@@ -526,27 +460,6 @@ def cast_to_int(s):
 def cast_to_float(s):
     try:
         return float(s)
-    except (ValueError, TypeError):
-        return 0
-
-
-def helper_divmod(a, b):
-    try:
-        return divmod(a, b)
-    except (ValueError, TypeError):
-        return 0
-
-
-def helper_len(s):
-    try:
-        return len(s)
-    except (ValueError, TypeError):
-        return 0
-
-
-def helper_round(n, ndigits=None):
-    try:
-        return round(n, ndigits)
     except (ValueError, TypeError):
         return 0
 
@@ -621,95 +534,16 @@ def process_json_kwargs(json_kwargs):
     return params
 
 
-def process_datatable_rows(rows, json_data, default_sort, search_cols=None, sort_keys=None):
-    if search_cols is None:
-        search_cols = []
-    if sort_keys is None:
-        sort_keys = {}
-
-    results = []
-
-    total_count = len(rows)
-
-    # Search results
-    search_value = json_data['search']['value'].lower()
-    if search_value:
-        searchable_columns = [d['data'] for d in json_data['columns'] if d['searchable']] + search_cols
-        for row in rows:
-            for k, v in row.items():
-                if k in sort_keys:
-                    value = sort_keys[k].get(v, v)
-                else:
-                    value = v
-                value = str(value).lower()
-                if k in searchable_columns and search_value in value:
-                    results.append(row)
-                    break
+def sanitize(string):
+    if string:
+        return str(string).replace('<','&lt;').replace('>','&gt;')
     else:
-        results = rows
-
-    filtered_count = len(results)
-
-    # Sort results
-    results = sorted(results, key=lambda k: k[default_sort].lower())
-    sort_order = json_data['order']
-    for order in reversed(sort_order):
-        sort_key = json_data['columns'][int(order['column'])]['data']
-        reverse = True if order['dir'] == 'desc' else False
-        results = sorted(results, key=lambda k: sort_helper(k, sort_key, sort_keys), reverse=reverse)
-
-    # Paginate results
-    results = results[json_data['start']:(json_data['start'] + json_data['length'])]
-
-    data = {
-        'results': results,
-        'total_count': total_count,
-        'filtered_count': filtered_count
-    }
-
-    return data
-
-
-def sort_helper(k, sort_key, sort_keys):
-    v = k[sort_key]
-    if sort_key in sort_keys:
-        v = sort_keys[sort_key].get(k[sort_key], v)
-    if isinstance(v, str):
-        v = v.lower()
-    return v
-
-
-def sanitize_out(*dargs, **dkwargs):
-    """ Helper decorator that sanitized the output
-    """
-    def rd(function):
-        @wraps(function)
-        def wrapper(*args, **kwargs):
-            return sanitize(function(*args, **kwargs))
-        return wrapper
-    return rd
-
-
-def sanitize(obj):
-    if isinstance(obj, str):
-        return str(obj).replace('<', '&lt;').replace('>', '&gt;')
-    elif isinstance(obj, list):
-        return [sanitize(o) for o in obj]
-    elif isinstance(obj, dict):
-        return {k: sanitize(v) for k, v in obj.items()}
-    elif isinstance(obj, tuple):
-        return tuple(sanitize(list(obj)))
-    else:
-        return obj
+        return ''
 
 
 def is_public_ip(host):
     ip = is_valid_ip(get_ip(host))
-    ip_version = ip.version()
-    ip_type = ip.iptype()
-    if ip and ip_type != 'LOOPBACK' and (
-            ip_version == 4 and ip_type == 'PUBLIC' or
-            ip_version == 6 and 'LOCAL' not in ip_type):
+    if ip and ip.iptype() == 'PUBLIC':
         return True
     return False
 
@@ -718,12 +552,12 @@ def get_ip(host):
     ip_address = ''
     if is_valid_ip(host):
         return host
-    elif not re.match(r'^[0-9]+(?:\.[0-9]+){3}(?!\d*-[a-z0-9]{6})$', host):
+    else:
         try:
             ip_address = socket.getaddrinfo(host, None)[0][4][0]
-            logger.debug("IP Checker :: Resolved %s to %s." % (host, ip_address))
+            logger.debug(u"IP Checker :: Resolved %s to %s." % (host, ip_address))
         except:
-            logger.error("IP Checker :: Bad IP or hostname provided: %s." % host)
+            logger.error(u"IP Checker :: Bad IP or hostname provided.")
     return ip_address
 
 
@@ -736,13 +570,126 @@ def is_valid_ip(address):
         return False
 
 
+def install_geoip_db():
+    maxmind_url = 'http://geolite.maxmind.com/download/geoip/database/'
+    geolite2_gz = 'GeoLite2-City.mmdb.gz'
+    geolite2_md5 = 'GeoLite2-City.md5'
+    geolite2_db = geolite2_gz[:-3]
+    md5_checksum = ''
+
+    temp_gz = os.path.join(plexpy.CONFIG.CACHE_DIR, geolite2_gz)
+    geolite2_db = plexpy.CONFIG.GEOIP_DB or os.path.join(plexpy.DATA_DIR, geolite2_db)
+
+    # Retrieve the GeoLite2 gzip file
+    logger.debug(u"Tautulli Helpers :: Downloading GeoLite2 gzip file from MaxMind...")
+    try:
+        maxmind = urllib.request.URLopener()
+        maxmind.retrieve(maxmind_url + geolite2_gz, temp_gz)
+        md5_checksum = urllib.request.urlopen(maxmind_url + geolite2_md5).read().decode('utf-8')
+    except Exception as e:
+        logger.error(u"Tautulli Helpers :: Failed to download GeoLite2 gzip file from MaxMind: %s" % e)
+        return False
+
+    # Extract the GeoLite2 database file
+    logger.debug(u"Tautulli Helpers :: Extracting GeoLite2 database...")
+    try:
+        with gzip.open(temp_gz, 'rb') as gz:
+            with open(geolite2_db, 'wb') as db:
+                db.write(gz.read())
+    except Exception as e:
+        logger.error(u"Tautulli Helpers :: Failed to extract the GeoLite2 database: %s" % e)
+        return False
+
+    # Check MD5 hash for GeoLite2 database file
+    logger.debug(u"Tautulli Helpers :: Checking MD5 checksum for GeoLite2 database...")
+    try:
+        hash_md5 = hashlib.md5()
+        with open(geolite2_db, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        md5_hash = hash_md5.hexdigest()
+
+        if md5_hash != md5_checksum:
+            logger.error(u"Tautulli Helpers :: MD5 checksum doesn't match for GeoLite2 database. "
+                         "Checksum: %s, file hash: %s" % (md5_checksum, md5_hash))
+            return False
+    except Exception as e:
+        logger.error(u"Tautulli Helpers :: Failed to generate MD5 checksum for GeoLite2 database: %s" % e)
+        return False
+
+    # Delete temportary GeoLite2 gzip file
+    logger.debug(u"Tautulli Helpers :: Deleting temporary GeoLite2 gzip file...")
+    try:
+        os.remove(temp_gz)
+    except Exception as e:
+        logger.warn(u"Tautulli Helpers :: Failed to remove temporary GeoLite2 gzip file: %s" % e)
+
+    logger.debug(u"Tautulli Helpers :: GeoLite2 database installed successfully.")
+    plexpy.CONFIG.__setattr__('GEOIP_DB', geolite2_db)
+    plexpy.CONFIG.write()
+
+    return True
+
+
+def uninstall_geoip_db():
+    logger.debug(u"Tautulli Helpers :: Uninstalling the GeoLite2 database...")
+    try:
+        os.remove(plexpy.CONFIG.GEOIP_DB)
+        plexpy.CONFIG.__setattr__('GEOIP_DB', '')
+        plexpy.CONFIG.write()
+    except Exception as e:
+        logger.error(u"Tautulli Helpers :: Failed to uninstall the GeoLite2 database: %s" % e)
+        return False
+
+    logger.debug(u"Tautulli Helpers :: GeoLite2 database uninstalled successfully.")
+    return True
+
+
+def geoip_lookup(ip_address):
+    if not plexpy.CONFIG.GEOIP_DB:
+        return 'GeoLite2 database not installed. Please install from the ' \
+            '<a href="settings?install_geoip=true">Settings</a> page.'
+
+    if not ip_address:
+        return 'No IP address provided.'
+
+    try:
+        reader = geoip2.database.Reader(plexpy.CONFIG.GEOIP_DB)
+        geo = reader.city(ip_address)
+        reader.close()
+    except ValueError as e:
+        return 'Invalid IP address provided: %s.' % ip_address
+    except IOError as e:
+        return 'Missing GeoLite2 database. Please reinstall from the ' \
+            '<a href="settings?install_geoip=true">Settings</a> page.'
+    except maxminddb.InvalidDatabaseError as e:
+        return 'Invalid GeoLite2 database. Please reinstall from the ' \
+            '<a href="settings?reinstall_geoip=true">Settings</a> page.'
+    except geoip2.errors.AddressNotFoundError as e:
+        return '%s' % e
+    except Exception as e:
+        return 'Error: %s' % e
+
+    geo_info = {'continent': geo.continent.name,
+                'country': geo.country.name,
+                'region': geo.subdivisions.most_specific.name,
+                'city': geo.city.name,
+                'postal_code': geo.postal.code,
+                'timezone': geo.location.time_zone,
+                'latitude': geo.location.latitude,
+                'longitude': geo.location.longitude,
+                'accuracy': geo.location.accuracy_radius
+                }
+
+    return geo_info
+
+
 def whois_lookup(ip_address):
 
     nets = []
     err = None
     try:
-        whois = ipwhois.IPWhois(ip_address).lookup_whois(retry_count=0,
-                                                         asn_methods=['dns', 'whois', 'http'])
+        whois = ipwhois.IPWhois(ip_address).lookup_whois(retry_count=0)
         countries = ipwhois.utils.get_countries()
         nets = whois['nets']
         for net in nets:
@@ -779,31 +726,7 @@ def anon_url(*url):
     """
     Return a URL string consisting of the Anonymous redirect URL and an arbitrary number of values appended.
     """
-    if plexpy.CONFIG.ANON_REDIRECT_DYNAMIC:
-        cache_time = timestamp()
-        cache_filepath = os.path.join(plexpy.CONFIG.CACHE_DIR, 'anonymizer.json')
-        try:
-            with open(cache_filepath, 'r', encoding='utf-8') as cache_file:
-                cache_data = json.load(cache_file)
-                if cache_time - cache_data['_cache_time'] < 86400:  # 24 hours
-                    anon_redirect = cache_data['anon_redirect']
-                else:
-                    raise
-        except:
-            try:
-                anon_redirect = request.request_content('https://tautulli.com/anonymizer.txt').decode('utf-8')
-                cache_data = {
-                    'anon_redirect': anon_redirect,
-                    '_cache_time': cache_time
-                }
-                with open(cache_filepath, 'w', encoding='utf-8') as cache_file:
-                    json.dump(cache_data, cache_file)
-            except:
-                anon_redirect = plexpy.CONFIG.ANON_REDIRECT
-    else:
-        anon_redirect = plexpy.CONFIG.ANON_REDIRECT
-
-    return '' if None in url else '%s%s' % (anon_redirect, ''.join(str(s) for s in url))
+    return '' if None in url else '%s%s' % (plexpy.CONFIG.ANON_REDIRECT, ''.join(str(s) for s in url))
 
 
 def get_img_service(include_self=False):
@@ -822,7 +745,7 @@ def upload_to_imgur(img_data, img_title='', rating_key='', fallback=''):
     img_url = delete_hash = ''
 
     if not plexpy.CONFIG.IMGUR_CLIENT_ID:
-        logger.error("Tautulli Helpers :: Cannot upload image to Imgur. No Imgur client id specified in the settings.")
+        logger.error(u"Tautulli Helpers :: Cannot upload image to Imgur. No Imgur client id specified in the settings.")
         return img_url, delete_hash
 
     headers = {'Authorization': 'Client-ID %s' % plexpy.CONFIG.IMGUR_CLIENT_ID}
@@ -835,18 +758,18 @@ def upload_to_imgur(img_data, img_title='', rating_key='', fallback=''):
                                                            headers=headers, data=data)
 
     if response and not err_msg:
-        logger.debug("Tautulli Helpers :: Image '{}' ({}) uploaded to Imgur.".format(img_title, fallback))
+        logger.debug(u"Tautulli Helpers :: Image '{}' ({}) uploaded to Imgur.".format(img_title, fallback))
         imgur_response_data = response.json().get('data')
         img_url = imgur_response_data.get('link', '').replace('http://', 'https://')
         delete_hash = imgur_response_data.get('deletehash', '')
     else:
         if err_msg:
-            logger.error("Tautulli Helpers :: Unable to upload image '{}' ({}) to Imgur: {}".format(img_title, fallback, err_msg))
+            logger.error(u"Tautulli Helpers :: Unable to upload image '{}' ({}) to Imgur: {}".format(img_title, fallback, err_msg))
         else:
-            logger.error("Tautulli Helpers :: Unable to upload image '{}' ({}) to Imgur.".format(img_title, fallback))
+            logger.error(u"Tautulli Helpers :: Unable to upload image '{}' ({}) to Imgur.".format(img_title, fallback))
 
         if req_msg:
-            logger.debug("Tautulli Helpers :: Request response: {}".format(req_msg))
+            logger.debug(u"Tautulli Helpers :: Request response: {}".format(req_msg))
 
     return img_url, delete_hash
 
@@ -854,7 +777,7 @@ def upload_to_imgur(img_data, img_title='', rating_key='', fallback=''):
 def delete_from_imgur(delete_hash, img_title='', fallback=''):
     """ Deletes an image from Imgur """
     if not plexpy.CONFIG.IMGUR_CLIENT_ID:
-        logger.error("Tautulli Helpers :: Cannot delete image from Imgur. No Imgur client id specified in the settings.")
+        logger.error(u"Tautulli Helpers :: Cannot delete image from Imgur. No Imgur client id specified in the settings.")
         return False
 
     headers = {'Authorization': 'Client-ID %s' % plexpy.CONFIG.IMGUR_CLIENT_ID}
@@ -863,13 +786,13 @@ def delete_from_imgur(delete_hash, img_title='', fallback=''):
                                                            headers=headers)
 
     if response and not err_msg:
-        logger.debug("Tautulli Helpers :: Image '{}' ({}) deleted from Imgur.".format(img_title, fallback))
+        logger.debug(u"Tautulli Helpers :: Image '{}' ({}) deleted from Imgur.".format(img_title, fallback))
         return True
     else:
         if err_msg:
-            logger.error("Tautulli Helpers :: Unable to delete image '{}' ({}) from Imgur: {}".format(img_title, fallback, err_msg))
+            logger.error(u"Tautulli Helpers :: Unable to delete image '{}' ({}) from Imgur: {}".format(img_title, fallback, err_msg))
         else:
-            logger.error("Tautulli Helpers :: Unable to delete image '{}' ({}) from Imgur.".format(img_title, fallback))
+            logger.error(u"Tautulli Helpers :: Unable to delete image '{}' ({}) from Imgur.".format(img_title, fallback))
         return False
 
 
@@ -878,7 +801,7 @@ def upload_to_cloudinary(img_data, img_title='', rating_key='', fallback=''):
     img_url = ''
 
     if not plexpy.CONFIG.CLOUDINARY_CLOUD_NAME or not plexpy.CONFIG.CLOUDINARY_API_KEY or not plexpy.CONFIG.CLOUDINARY_API_SECRET:
-        logger.error("Tautulli Helpers :: Cannot upload image to Cloudinary. Cloudinary settings not specified in the settings.")
+        logger.error(u"Tautulli Helpers :: Cannot upload image to Cloudinary. Cloudinary settings not specified in the settings.")
         return img_url
 
     cloudinary.config(
@@ -887,29 +810,23 @@ def upload_to_cloudinary(img_data, img_title='', rating_key='', fallback=''):
         api_secret=plexpy.CONFIG.CLOUDINARY_API_SECRET
     )
 
-    # Cloudinary library has very poor support for non-ASCII characters on Python 2
-    if plexpy.PYTHON2:
-        _img_title = latinToAscii(img_title, replace=True)
-    else:
-        _img_title = img_title
-
     try:
-        response = upload((img_title, img_data),
+        response = upload(b'data:image/png;base64,%b' % base64.b64encode(img_data),
                           public_id='{}_{}'.format(fallback, rating_key),
-                          tags=['tautulli', fallback, str(rating_key)],
-                          context={'title': _img_title, 'rating_key': str(rating_key), 'fallback': fallback})
-        logger.debug("Tautulli Helpers :: Image '{}' ({}) uploaded to Cloudinary.".format(img_title, fallback))
+                          tags=[fallback, str(rating_key)],
+                          context={'title': img_title, 'rating_key': str(rating_key), 'fallback': fallback})
+        logger.debug(u"Tautulli Helpers :: Image '{}' ({}) uploaded to Cloudinary.".format(img_title, fallback))
         img_url = response.get('url', '')
     except Exception as e:
-        logger.error("Tautulli Helpers :: Unable to upload image '{}' ({}) to Cloudinary: {}".format(img_title, fallback, e))
+        logger.error(u"Tautulli Helpers :: Unable to upload image '{}' ({}) to Cloudinary: {}".format(img_title, fallback, e))
 
     return img_url
 
 
-def delete_from_cloudinary(rating_key=None, delete_all=False):
+def delete_from_cloudinary(rating_key):
     """ Deletes an image from Cloudinary """
     if not plexpy.CONFIG.CLOUDINARY_CLOUD_NAME or not plexpy.CONFIG.CLOUDINARY_API_KEY or not plexpy.CONFIG.CLOUDINARY_API_SECRET:
-        logger.error("Tautulli Helpers :: Cannot delete image from Cloudinary. Cloudinary settings not specified in the settings.")
+        logger.error(u"Tautulli Helpers :: Cannot delete image from Cloudinary. Cloudinary settings not specified in the settings.")
         return False
 
     cloudinary.config(
@@ -918,15 +835,9 @@ def delete_from_cloudinary(rating_key=None, delete_all=False):
         api_secret=plexpy.CONFIG.CLOUDINARY_API_SECRET
     )
 
-    if delete_all:
-        delete_resources_by_tag('tautulli')
-        logger.debug("Tautulli Helpers :: Deleted all images from Cloudinary.")
-    elif rating_key:
-        delete_resources_by_tag(str(rating_key))
-        logger.debug("Tautulli Helpers :: Deleted images from Cloudinary with rating_key {}.".format(rating_key))
-    else:
-        logger.debug("Tautulli Helpers :: Unable to delete images from Cloudinary: No rating_key provided.")
+    delete_resources_by_tag(str(rating_key))
 
+    logger.debug(u"Tautulli Helpers :: Deleted images from Cloudinary with rating_key {}.".format(rating_key))
     return True
 
 
@@ -935,7 +846,7 @@ def cloudinary_transform(rating_key=None, width=1000, height=1500, opacity=100, 
     url = ''
 
     if not plexpy.CONFIG.CLOUDINARY_CLOUD_NAME or not plexpy.CONFIG.CLOUDINARY_API_KEY or not plexpy.CONFIG.CLOUDINARY_API_SECRET:
-        logger.error("Tautulli Helpers :: Cannot transform image on Cloudinary. Cloudinary settings not specified in the settings.")
+        logger.error(u"Tautulli Helpers :: Cannot transform image on Cloudinary. Cloudinary settings not specified in the settings.")
         return url
 
     cloudinary.config(
@@ -947,7 +858,7 @@ def cloudinary_transform(rating_key=None, width=1000, height=1500, opacity=100, 
     img_options = {'format': img_format,
                    'fetch_format': 'auto',
                    'quality': 'auto',
-                   'version': timestamp(),
+                   'version': int(time.time()),
                    'secure': True}
 
     if width != 1000:
@@ -965,9 +876,9 @@ def cloudinary_transform(rating_key=None, width=1000, height=1500, opacity=100, 
 
     try:
         url, options = cloudinary_url('{}_{}'.format(fallback, rating_key), **img_options)
-        logger.debug("Tautulli Helpers :: Image '{}' ({}) transformed on Cloudinary.".format(img_title, fallback))
+        logger.debug(u"Tautulli Helpers :: Image '{}' ({}) transformed on Cloudinary.".format(img_title, fallback))
     except Exception as e:
-        logger.error("Tautulli Helpers :: Unable to transform image '{}' ({}) on Cloudinary: {}".format(img_title, fallback, e))
+        logger.error(u"Tautulli Helpers :: Unable to transform image '{}' ({}) on Cloudinary: {}".format(img_title, fallback, e))
 
     return url
 
@@ -980,7 +891,7 @@ def cache_image(url, image=None):
     # Create image directory if it doesn't exist
     imgdir = os.path.join(plexpy.CONFIG.CACHE_DIR, 'images/')
     if not os.path.exists(imgdir):
-        logger.debug("Tautulli Helpers :: Creating image cache directory at %s" % imgdir)
+        logger.debug(u"Tautulli Helpers :: Creating image cache directory at %s" % imgdir)
         os.makedirs(imgdir)
 
     # Create a hash of the url to use as the filename
@@ -993,7 +904,7 @@ def cache_image(url, image=None):
             with open(imagefile, 'wb') as cache_file:
                 cache_file.write(image)
         except IOError as e:
-            logger.error("Tautulli Helpers :: Failed to cache image %s: %s" % (imagefile, e))
+            logger.error(u"Tautulli Helpers :: Failed to cache image %s: %s" % (imagefile, e))
 
     # Try to return the image from the cache directory
     if os.path.isfile(imagefile):
@@ -1016,28 +927,13 @@ def build_datatables_json(kwargs, dt_columns, default_sort_col=None):
     if not default_sort_col:
         default_sort_col = dt_columns[0][0]
 
-    column_names = [c[0] for c in dt_columns]
-    order_columns = [c.strip() for c in kwargs.pop("order_column", default_sort_col).split(",")]
-    order_dirs = [d.strip() for d in kwargs.pop("order_dir", "desc").split(",")]
-
-    order = []
-    for c, d in zip_longest(order_columns, order_dirs, fillvalue=""):
-        try:
-            order_column = column_names.index(c)
-        except ValueError:
-            continue
-
-        if d.lower() in ("asc", "desc"):
-            order_dir = d.lower()
-        else:
-            order_dir = "desc"
-
-        order.append({"column": order_column, "dir": order_dir})
+    order_column = [c[0] for c in dt_columns].index(kwargs.pop("order_column", default_sort_col))
 
     # Build json data
     json_data = {"draw": 1,
                  "columns": columns,
-                 "order": order,
+                 "order": [{"column": order_column,
+                            "dir": kwargs.pop("order_dir", "desc")}],
                  "start": int(kwargs.pop("start", 0)),
                  "length": int(kwargs.pop("length", 25)),
                  "search": {"value": kwargs.pop("search", "")}
@@ -1045,14 +941,13 @@ def build_datatables_json(kwargs, dt_columns, default_sort_col=None):
     return json.dumps(json_data)
 
 
-def human_file_size(bytes, si=True):
+def humanFileSize(bytes, si=False):
     if str(bytes).isdigit():
-        bytes = cast_to_float(bytes)
+        bytes = int(bytes)
     else:
         return bytes
 
-    #thresh = 1000 if si else 1024
-    thresh = 1024  # Always divide by 2^10 but display SI units
+    thresh = 1000 if si else 1024
     if bytes < thresh:
         return str(bytes) + ' B'
 
@@ -1067,7 +962,7 @@ def human_file_size(bytes, si=True):
         bytes /= thresh
         u += 1
 
-    return "{0:.2f} {1}".format(bytes, units[u])
+    return "{0:.1f} {1}".format(bytes, units[u])
 
 
 def parse_condition_logic_string(s, num_cond=0):
@@ -1211,13 +1106,13 @@ def get_plexpy_url(hostname=None):
     else:
         hostname = hostname or plexpy.CONFIG.HTTP_HOST
 
-    if plexpy.HTTP_PORT not in (80, 443):
-        port = ':' + str(plexpy.HTTP_PORT)
+    if plexpy.CONFIG.HTTP_PORT not in (80, 443):
+        port = ':' + str(plexpy.CONFIG.HTTP_PORT)
     else:
         port = ''
 
-    if plexpy.HTTP_ROOT is not None and plexpy.HTTP_ROOT.strip('/'):
-        root = '/' + plexpy.HTTP_ROOT.strip('/')
+    if plexpy.CONFIG.HTTP_ROOT.strip('/'):
+        root = '/' + plexpy.CONFIG.HTTP_ROOT.strip('/')
     else:
         root = ''
 
@@ -1238,11 +1133,6 @@ def grouper(iterable, n, fillvalue=None):
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
     return zip_longest(fillvalue=fillvalue, *args)
-
-
-def chunk(it, size):
-    it = iter(it)
-    return iter(lambda: tuple(islice(it, size)), ())
 
 
 def traverse_map(obj, func):
@@ -1266,469 +1156,6 @@ def split_args(args=None):
     if isinstance(args, list):
         return args
     elif isinstance(args, str):
-        if plexpy.PYTHON2:
-            args = args.encode('utf-8')
-        args = shlex.split(args)
-        if plexpy.PYTHON2:
-            args = [a.decode('utf-8') for a in args]
-        return args
+        return [arg
+                for arg in shlex.split(args)]
     return []
-
-
-def mask_config_passwords(config):
-    if isinstance(config, list):
-        for cfg in config:
-            if 'password' in cfg.get('name', '') and cfg.get('value', '') != '':
-                cfg['value'] = '    '
-
-    elif isinstance(config, dict):
-        for cfg, val in config.items():
-            # Check for a password config keys and if the password is not blank
-            if 'password' in cfg and val != '':
-                # Set the password to blank so it is not exposed in the HTML form
-                config[cfg] = '    '
-
-    return config
-
-
-def bool_true(value, return_none=False):
-    if value is None and return_none:
-        return None
-    elif value is True or value == 1:
-        return True
-    elif isinstance(value, str) and value.lower() in ('1', 'true', 't', 'yes', 'y', 'on'):
-        return True
-    return False
-
-
-def sort_attrs(attr):
-    if isinstance(attr, (list, tuple)):
-        a = attr[0].split('.')
-    else:
-        a = attr.split('.')
-    return len(a), a
-
-
-def sort_obj(obj):
-    if isinstance(obj, list):
-        result_obj = []
-        for item in obj:
-            result_obj.append(sort_obj(item))
-    elif isinstance(obj, dict):
-        result_start = []
-        result_end = []
-        for k, v in obj.items():
-            if isinstance(v, list):
-                for item in v:
-                    if isinstance(item, dict):
-                        result_end.append([k, sort_obj(v)])
-                    else:
-                        result_start.append([k, sort_obj(v)])
-                if not v:
-                    result_end.append([k, v])
-            else:
-                result_start.append([k, sort_obj(v)])
-
-        result_obj = OrderedDict(sorted(result_start) + sorted(result_end))
-    else:
-        result_obj = obj
-
-    return result_obj
-
-
-def get_attrs_to_dict(obj, attrs):
-    d = {}
-
-    for attr, sub in attrs.items():
-        no_attr = False
-
-        if isinstance(obj, dict):
-            value = obj.get(attr, None)
-        else:
-            try:
-                value = getattr(obj, attr)
-            except AttributeError:
-                no_attr = True
-                value = None
-
-        if callable(value):
-            value = value()
-
-        if isinstance(sub, str):
-            if isinstance(value, list):
-                value = [getattr(o, sub, None) for o in value]
-            else:
-                value = getattr(value, sub, None)
-        elif isinstance(sub, dict):
-            if isinstance(value, list):
-                value = [get_attrs_to_dict(o, sub) for o in value] or [get_attrs_to_dict({}, sub)]
-            else:
-                value = get_attrs_to_dict(value, sub)
-        elif callable(sub):
-            if isinstance(value, list):
-                value = [sub(o) for o in value]
-            else:
-                if no_attr:
-                    value = sub(obj)
-                else:
-                    value = sub(value)
-
-        d[attr] = value
-
-    return d
-
-
-def flatten_dict(obj):
-    return flatten_tree(flatten_keys(obj))
-
-
-def flatten_keys(obj, key='', sep='.'):
-    if isinstance(obj, list):
-        new_obj = [flatten_keys(o, key=key) for o in obj]
-    elif isinstance(obj, dict):
-        new_key = key + sep if key else ''
-        new_obj = {new_key + k: flatten_keys(v, key=new_key + k) for k, v in obj.items()}
-    else:
-        new_obj = obj
-
-    return new_obj
-
-
-def flatten_tree(obj, key=''):
-    if isinstance(obj, list):
-        new_rows = []
-
-        for o in obj:
-            if isinstance(o, dict):
-                new_rows.extend(flatten_tree(o))
-            else:
-                new_rows.append({key: o})
-
-    elif isinstance(obj, dict):
-        common_keys = {}
-        all_rows = [[common_keys]]
-
-        for k, v in obj.items():
-            if isinstance(v, list):
-                all_rows.append(flatten_tree(v, k))
-            elif isinstance(v, dict):
-                common_keys.update(*flatten_tree(v))
-            else:
-                common_keys[k] = v
-
-        new_rows = [{k: v for r in row for k, v in r.items()}
-                    for row in zip_longest(*all_rows, fillvalue={})]
-
-    else:
-        new_rows = []
-
-    return new_rows
-
-
-# https://stackoverflow.com/a/14692747
-def get_by_path(root, items):
-    """Access a nested object in root by item sequence."""
-    return reduce(operator.getitem, items, root)
-
-
-def set_by_path(root, items, value):
-    """Set a value in a nested object in root by item sequence."""
-    get_by_path(root, items[:-1])[items[-1]] = value
-
-
-def get_dict_value_by_path(root, attr):
-    split_attr = attr.split('.')
-    value = get_by_path(root, split_attr)
-    for _attr in reversed(split_attr):
-        value = {_attr: value}
-    return value
-
-
-# https://stackoverflow.com/a/7205107
-def dict_merge(a, b, path=None):
-    if path is None:
-        path = []
-    for key in b:
-        if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                dict_merge(a[key], b[key], path + [str(key)])
-            elif a[key] == b[key]:
-                pass
-            else:
-                pass
-        else:
-            a[key] = b[key]
-    return a
-
-
-#https://stackoverflow.com/a/26853961
-def dict_update(*dict_args):
-    """
-    Given any number of dictionaries, shallow copy and merge into a new dict,
-    precedence goes to key value pairs in latter dictionaries.
-    """
-    result = {}
-    for dictionary in dict_args:
-        result.update(dictionary)
-    return result
-
-
-# https://stackoverflow.com/a/28703510
-def escape_xml(value):
-    if value is None:
-        return ''
-
-    value = str(value) \
-        .replace("&", "&amp;") \
-        .replace("<", "&lt;") \
-        .replace(">", "&gt;") \
-        .replace('"', "&quot;") \
-        .replace("'", "&apos;")
-    return value
-
-
-# https://gist.github.com/reimund/5435343/
-def dict_to_xml(d, root_node=None, indent=None, level=0):
-    line_break = '' if indent is None else '\n'
-    wrap = not bool(root_node is None or isinstance(d, list))
-    root = root_node or 'objects'
-    root_singular = root[:-1] if root.endswith('s') and isinstance(d, list) else root
-    xml = ''
-    children = []
-
-    if isinstance(d, dict):
-        for key, value in sorted(d.items()):
-            if isinstance(value, dict):
-                children.append(dict_to_xml(value, key, indent, level + 1))
-            elif isinstance(value, list):
-                children.append(dict_to_xml(value, key, indent, level + 1))
-            else:
-                xml = '{} {}="{}"'.format(xml, key, escape_xml(value))
-    elif isinstance(d, list):
-        for value in d:
-            # Custom tag replacement for collections/playlists
-            if isinstance(value, dict) and root in ('children', 'items'):
-                root_singular = value.get('type', root_singular)
-            children.append(dict_to_xml(value, root_singular, indent, level))
-    else:
-        children.append(escape_xml(d))
-
-    end_tag = '>' if len(children) > 0 else '/>'
-    end_tag += line_break if isinstance(d, list) or isinstance(d, dict) else ''
-    spaces = ' ' * level * (indent or 0)
-
-    if wrap or isinstance(d, dict):
-        xml = '{}<{}{}{}'.format(spaces, root, xml, end_tag)
-
-    if len(children) > 0:
-        for child in children:
-            xml = '{}{}'.format(xml, child)
-
-        if wrap or isinstance(d, dict):
-            spaces = spaces if isinstance(d, dict) else ''
-            xml = '{}{}</{}>{}'.format(xml, spaces, root, line_break)
-
-    return xml
-
-
-def move_to_front(l, value):
-    try:
-        l.insert(0, l.pop(l.index(value)))
-    except (ValueError, IndexError):
-        pass
-    return l
-
-
-def is_hdr(bit_depth, color_space):
-    bit_depth = cast_to_int(bit_depth)
-    return bit_depth > 8 and color_space == 'bt2020nc'
-
-
-def version_to_tuple(version):
-    return tuple(cast_to_int(v) for v in version.strip('v').replace('-', '.').split('.'))
-
-
-# https://stackoverflow.com/a/1855118
-def zipdir(path, ziph):
-    # ziph is zipfile handle
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            ziph.write(os.path.join(root, file),
-                       arcname=os.path.relpath(os.path.join(root, file),
-                                               os.path.join(path, '.')))
-
-
-def page(endpoint, *args, **kwargs):
-    endpoints = {
-        'pms_image_proxy': pms_image_proxy,
-        'info': info_page,
-        'library': library_page,
-        'user': user_page
-    }
-
-    params = {}
-
-    if endpoint in endpoints:
-        params = endpoints[endpoint](*args, **kwargs)
-
-    return endpoint + '?' + urlencode(params)
-
-
-def pms_image_proxy(img=None, rating_key=None, width=None, height=None,
-                    opacity=None, background=None, blur=None, img_format=None,
-                    fallback=None, refresh=None, clip=None):
-    params = {}
-
-    if img is not None:
-        params['img'] = img
-    if rating_key is not None:
-        params['rating_key'] = rating_key
-    if width is not None:
-        params['width'] = width
-    if height is not None:
-        params['height'] = height
-    if opacity is not None:
-        params['opacity'] = opacity
-    if background is not None:
-        params['background'] = background
-    if blur is not None:
-        params['blur'] = blur
-    if img_format is not None:
-        params['img_format'] = img_format
-    if fallback is not None:
-        params['fallback'] = fallback
-    if refresh is not None:
-        params['refresh'] = 'true'
-    if clip is not None:
-        params['clip'] = 'true'
-
-    return params
-
-
-def info_page(rating_key=None, guid=None, history=None, live=None):
-    params = {}
-
-    if live and history:
-        params['guid'] = guid
-    else:
-        params['rating_key'] = rating_key
-
-    if history:
-        params['source'] = 'history'
-
-    return params
-
-
-def library_page(section_id=None):
-    params = {}
-
-    if section_id is not None:
-        params['section_id'] = section_id
-
-    return params
-
-
-def user_page(user_id=None, user=None):
-    params = {}
-
-    if user_id is not None:
-        params['user_id'] = user_id
-    if user is not None:
-        params['user'] = user
-
-    return params
-
-
-def browse_path(path=None, include_hidden=False, filter_ext=''):
-    output = []
-
-    if os.name == 'nt' and path.lower() == 'my computer':
-        drives = ['%s:\\' % d for d in string.ascii_uppercase if os.path.exists('%s:' % d)]
-        for drive in drives:
-            out = {
-                'key': base64.b64encode(drive.encode('UTF-8')),
-                'path': drive,
-                'title': drive,
-                'type': 'folder',
-                'icon': 'folder'
-            }
-            output.append(out)
-
-    if os.path.isfile(path):
-        path = os.path.dirname(path)
-
-    if not os.path.isdir(path):
-        return output
-
-    if path != os.path.dirname(path):
-        parent_path = os.path.dirname(path)
-        out = {
-            'key': base64.b64encode(parent_path.encode('UTF-8')),
-            'path': parent_path,
-            'title': '..',
-            'type': 'folder',
-            'icon': 'level-up-alt'
-        }
-        output.append(out)
-    elif os.name == 'nt':
-        parent_path = 'My Computer'
-        out = {
-            'key': base64.b64encode(parent_path.encode('UTF-8')),
-            'path': parent_path,
-            'title': parent_path,
-            'type': 'folder',
-            'icon': 'level-up-alt'
-        }
-        output.append(out)
-
-    for root, dirs, files in os.walk(path):
-        for d in sorted(dirs):
-            if not include_hidden and d.startswith('.'):
-                continue
-            dir_path = os.path.join(root, d)
-            out = {
-                'key': base64.b64encode(dir_path.encode('UTF-8')),
-                'path': dir_path,
-                'title': d,
-                'type': 'folder',
-                'icon': 'folder'
-            }
-            output.append(out)
-
-        if filter_ext == '.folderonly':
-            break
-
-        for f in sorted(files):
-            if not include_hidden and f.startswith('.'):
-                continue
-            if filter_ext and not f.endswith(filter_ext):
-                continue
-            file_path = os.path.join(root, f)
-            out = {
-                'key': base64.b64encode(file_path.encode('UTF-8')),
-                'path': file_path,
-                'title': f,
-                'type': 'file',
-                'icon': 'file'
-            }
-            output.append(out)
-
-        break
-
-    return output
-
-
-def delete_file(file_path):
-    logger.info("Tautulli Helpers :: Deleting file: %s", file_path)
-    try:
-        os.remove(file_path)
-        return True
-    except OSError:
-        logger.error("Tautulli Helpers :: Failed to delete file: %s", file_path)
-        return False
-
-
-def short_season(title):
-    if title.startswith('Season ') and title[7:].isdigit():
-        return 'S%s' % title[7:]
-    return title

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 #  This file is part of Tautulli.
 #
 #  Tautulli is free software: you can redistribute it and/or modify
@@ -19,48 +17,13 @@ import os
 import sys
 
 import cherrypy
+import portend
 
 import plexpy
-if plexpy.PYTHON2:
-    import logger
-    import webauth
-    from helpers import create_https_certificates
-    from webserve import WebInterface, BaseRedirect
-else:
-    from plexpy import logger
-    from plexpy import webauth
-    from plexpy.helpers import create_https_certificates
-    from plexpy.webserve import WebInterface, BaseRedirect
-
-
-def start():
-    logger.info("Tautulli WebStart :: Initializing Tautulli web server...")
-    web_config = {
-        'http_port': plexpy.HTTP_PORT,
-        'http_host': plexpy.CONFIG.HTTP_HOST,
-        'http_root': plexpy.CONFIG.HTTP_ROOT,
-        'http_environment': plexpy.CONFIG.HTTP_ENVIRONMENT,
-        'http_proxy': plexpy.CONFIG.HTTP_PROXY,
-        'enable_https': plexpy.CONFIG.ENABLE_HTTPS,
-        'https_cert': plexpy.CONFIG.HTTPS_CERT,
-        'https_cert_chain': plexpy.CONFIG.HTTPS_CERT_CHAIN,
-        'https_key': plexpy.CONFIG.HTTPS_KEY,
-        'http_username': plexpy.CONFIG.HTTP_USERNAME,
-        'http_password': plexpy.CONFIG.HTTP_PASSWORD,
-        'http_basic_auth': plexpy.CONFIG.HTTP_BASIC_AUTH
-    }
-    initialize(web_config)
-
-
-def stop():
-    logger.info("Tautulli WebStart :: Stopping Tautulli web server...")
-    cherrypy.engine.exit()
-
-
-def restart():
-    logger.info("Tautulli WebStart :: Restarting Tautulli web server...")
-    stop()
-    start()
+from plexpy import logger
+from plexpy import webauth
+from plexpy.helpers import create_https_certificates
+from plexpy.webserve import WebInterface
 
 
 def initialize(options):
@@ -77,20 +40,18 @@ def initialize(options):
                 (not (https_cert and os.path.exists(https_cert)) or
                  not (https_key and os.path.exists(https_key))):
             if not create_https_certificates(https_cert, https_key):
-                logger.warn("Tautulli WebStart :: Unable to create certificate and key. Disabling HTTPS")
+                logger.warn(u"Tautulli WebStart :: Unable to create certificate and key. Disabling HTTPS")
                 enable_https = False
 
         if not (os.path.exists(https_cert) and os.path.exists(https_key)):
-            logger.warn("Tautulli WebStart :: Disabled HTTPS because of missing certificate and key.")
+            logger.warn(u"Tautulli WebStart :: Disabled HTTPS because of missing certificate and key.")
             enable_https = False
 
     options_dict = {
         'server.socket_port': options['http_port'],
         'server.socket_host': options['http_host'],
         'environment': options['http_environment'],
-        'server.thread_pool': plexpy.CONFIG.HTTP_THREAD_POOL,
-        'server.max_request_body_size': 1073741824,
-        'server.socket_timeout': 60,
+        'server.thread_pool': 10,
         'tools.encode.on': True,
         'tools.encode.encoding': 'utf-8',
         'tools.decode.on': True
@@ -117,48 +78,40 @@ def initialize(options):
         if plexpy.CONFIG.HTTP_PLEX_ADMIN:
             login_allowed.append("Plex admin")
 
-        logger.info("Tautulli WebStart :: Web server authentication is enabled: %s.", ' and '.join(login_allowed))
+        logger.info(u"Tautulli WebStart :: Web server authentication is enabled: %s.", ' and '.join(login_allowed))
 
         if options['http_basic_auth']:
-            plexpy.AUTH_ENABLED = False
+            auth_enabled = False
             basic_auth_enabled = True
         else:
-            plexpy.AUTH_ENABLED = True
+            auth_enabled = True
             basic_auth_enabled = False
             cherrypy.tools.auth = cherrypy.Tool('before_handler', webauth.check_auth, priority=2)
     else:
-        logger.warn("Tautulli WebStart :: Web server authentication is disabled!")
-
-        plexpy.AUTH_ENABLED = False
-        basic_auth_enabled = False
+        auth_enabled = basic_auth_enabled = False
 
     if options['http_root'].strip('/'):
-        plexpy.HTTP_ROOT = options['http_root'] = '/' + str(options['http_root'].strip('/')) + '/'
+        plexpy.HTTP_ROOT = options['http_root'] = '/' + options['http_root'].strip('/') + '/'
     else:
         plexpy.HTTP_ROOT = options['http_root'] = '/'
 
-    logger.info("Tautulli WebStart :: Thread Pool Size: %d.", plexpy.CONFIG.HTTP_THREAD_POOL)
     cherrypy.config.update(options_dict)
 
     conf = {
         '/': {
-            'engine.timeout_monitor.on': False,
             'tools.staticdir.root': os.path.join(plexpy.PROG_DIR, 'data'),
             'tools.proxy.on': bool(options['http_proxy']),
             'tools.gzip.on': True,
             'tools.gzip.mime_types': ['text/html', 'text/plain', 'text/css',
                                       'text/javascript', 'application/json',
                                       'application/javascript'],
-            'tools.auth.on': plexpy.AUTH_ENABLED,
+            'tools.auth.on': auth_enabled,
             'tools.auth_basic.on': basic_auth_enabled,
             'tools.auth_basic.realm': 'Tautulli web server',
             'tools.auth_basic.checkpassword': cherrypy.lib.auth_basic.checkpassword_dict({
                 options['http_username']: options['http_password']})
         },
         '/api': {
-            'tools.auth_basic.on': False
-        },
-        '/status': {
             'tools.auth_basic.on': False
         },
         '/interfaces': {
@@ -228,19 +181,20 @@ def initialize(options):
             'tools.sessions.on': False,
             'tools.auth.on': False
         },
-        '/pms_image_proxy': {
-           'tools.caching.on': True,
-           'tools.caching.force': True,
-           'tools.caching.delay': 0,
-           'tools.expires.on': True,
-           'tools.expires.secs': 60 * 60 * 24 * 30,  # 30 days
-           'tools.auth.on': False,
-           'tools.sessions.on': False
-        },
+        #'/pms_image_proxy': {
+        #    'tools.staticdir.on': True,
+        #    'tools.staticdir.dir': os.path.join(plexpy.CONFIG.CACHE_DIR, 'images'),
+        #    'tools.caching.on': True,
+        #    'tools.caching.force': True,
+        #    'tools.caching.delay': 0,
+        #    'tools.expires.on': True,
+        #    'tools.expires.secs': 60 * 60 * 24 * 30,  # 30 days
+        #    'tools.auth.on': False,
+        #    'tools.sessions.on': False
+        #},
         '/favicon.ico': {
             'tools.staticfile.on': True,
-            'tools.staticfile.filename': os.path.abspath(os.path.join(
-                plexpy.PROG_DIR, 'data/interfaces/default/images/favicon/favicon.ico')),
+            'tools.staticfile.filename': os.path.abspath(os.path.join(plexpy.PROG_DIR, 'data/interfaces/default/images/favicon/favicon.ico')),
             'tools.caching.on': True,
             'tools.caching.force': True,
             'tools.caching.delay': 0,
@@ -251,30 +205,37 @@ def initialize(options):
         }
     }
 
+    # Prevent time-outs
+    #cherrypy.engine.timeout_monitor.unsubscribe()
     cherrypy.tree.mount(WebInterface(), options['http_root'], config=conf)
     if plexpy.HTTP_ROOT != '/':
         cherrypy.tree.mount(BaseRedirect(), '/')
 
     try:
-        logger.info("Tautulli WebStart :: Starting Tautulli web server on %s://%s:%d%s", protocol,
+        logger.info(u"Tautulli WebStart :: Starting Tautulli web server on %s://%s:%d%s", protocol,
                     options['http_host'], options['http_port'], options['http_root'])
-        #cherrypy.process.servers.check_port(str(options['http_host']), options['http_port'])
+        portend.free(str(options['http_host']), options['http_port'])
         if not plexpy.DEV:
             cherrypy.server.start()
         else:
             cherrypy.engine.signals.subscribe()
             cherrypy.engine.start()
             cherrypy.engine.block()
-    except IOError as e:
-        logger.error("Tautulli WebStart :: Failed to start Tautulli: %s", e)
-        plexpy.alert_message('Failed to start Tautulli: %s' % e)
+    except IOError:
+        sys.stderr.write('Failed to start on port: %i. Is something else running?\n' % (options['http_port']))
         sys.exit(1)
 
     cherrypy.server.wait()
 
 
+class BaseRedirect(object):
+    @cherrypy.expose
+    def index(self):
+        raise cherrypy.HTTPRedirect(plexpy.HTTP_ROOT)
+
+
 def proxy():
-    # logger.debug("REQUEST URI: %s, HEADER [X-Forwarded-Host]: %s, [X-Host]: %s, [Origin]: %s, [Host]: %s",
+    # logger.debug(u"REQUEST URI: %s, HEADER [X-Forwarded-Host]: %s, [X-Host]: %s, [Origin]: %s, [Host]: %s",
     #              cherrypy.request.wsgi_environ['REQUEST_URI'],
     #              cherrypy.request.headers.get('X-Forwarded-Host'),
     #              cherrypy.request.headers.get('X-Host'),
@@ -290,7 +251,7 @@ def proxy():
             local = 'Origin'
         elif cherrypy.request.headers.get('Host'):  # nginx
             local = 'Host'
-        # logger.debug("cherrypy.tools.proxy.local set to [%s]", local)
+        # logger.debug(u"cherrypy.tools.proxy.local set to [%s]", local)
 
     # Call original cherrypy proxy tool with the new local
     cherrypy.lib.cptools.proxy(local=local)

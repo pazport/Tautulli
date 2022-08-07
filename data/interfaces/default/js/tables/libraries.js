@@ -17,10 +17,6 @@ libraries_list_table_options = {
     "pageLength": 25,
     "order": [ 2, 'asc'],
     "stateSave": true,
-    "stateSaveParams": function (settings, data) {
-        data.search.search = "";
-        data.start = 0;
-    },
     "stateDuration": 0,
     "pagingType": "full_numbers",
     "autoWidth": false,
@@ -31,9 +27,9 @@ libraries_list_table_options = {
             "data": null,
             "createdCell": function (td, cellData, rowData, row, col) {
                 $(td).html('<div class="edit-library-toggles">' +
-                    '<button class="btn btn-xs btn-warning delete-library" data-id="' + rowData['row_id'] + '" data-toggle="button"><i class="fa fa-trash-o fa-fw"></i> Delete</button>&nbsp' +
-                    '<button class="btn btn-xs btn-warning purge-library" data-id="' + rowData['row_id'] + '" data-toggle="button"><i class="fa fa-eraser fa-fw"></i> Purge</button>&nbsp&nbsp&nbsp' +
-                    '<input type="checkbox" id="keep_history-' + rowData['section_id'] + '" name="keep_history" value="1" ' + (rowData['keep_history'] ? 'checked' : '') + '><label class="edit-tooltip" for="keep_history-' + rowData['section_id'] + '" data-toggle="tooltip" title="Toggle History"><i class="fa fa-history fa-lg fa-fw"></i></label>&nbsp' +
+                    '<button class="btn btn-xs btn-warning delete-library" data-id="' + rowData['library_id'] + '" data-toggle="button"><i class="fa fa-trash-o fa-fw"></i> Delete</button>&nbsp' +
+                    '<button class="btn btn-xs btn-warning purge-library" data-id="' + rowData['library_id'] + '" data-toggle="button"><i class="fa fa-eraser fa-fw"></i> Purge</button>&nbsp&nbsp&nbsp' +
+                    '<input type="checkbox" id="keep_history-' + rowData['library_id'] + '" name="keep_history" value="1" ' + rowData['keep_history'] + '><label class="edit-tooltip" for="keep_history-' + rowData['library_id'] + '" data-toggle="tooltip" title="Toggle History"><i class="fa fa-history fa-lg fa-fw"></i></label>&nbsp' +
                     '</div>');
             },
             "width": "7%",
@@ -45,16 +41,14 @@ libraries_list_table_options = {
             "targets": [1],
             "data": "library_thumb",
             "createdCell": function (td, cellData, rowData, row, col) {
-                var inactive = '';
-                if (!rowData['is_active']) { inactive = '<span class="inactive-library-tooltip" data-toggle="tooltip" title="Library not on Plex server"><i class="fa fa-exclamation-triangle"></i></span>'; }
                 if (cellData !== null && cellData !== '') {
                     if (rowData['library_thumb'].substring(0, 4) == "http") {
-                        $(td).html('<a href="' + page('library', rowData['section_id']) + '"><div class="libraries-poster-face" style="background-image: url(' + rowData['library_thumb'] + ');">' + inactive + '</div></a>');
+                        $(td).html('<a href="library?library_id=' + rowData['library_id'] + '"><div class="libraries-poster-face" style="background-image: url(' + rowData['library_thumb'] + ');"></div></a>');
                     } else {
-                        $(td).html('<a href="' + page('library', rowData['section_id']) + '"><div class="libraries-poster-face svg-icon library-' + rowData['section_type'] + '">' + inactive + '</div></a>');
+                        $(td).html('<a href="library?library_id=' + rowData['library_id'] + '"><div class="libraries-poster-face svg-icon library-' + rowData['section_type'] + '"></div></a>');
                     }
                 } else {
-                    $(td).html('<a href="' + page('library', rowData['section_id']) + '"><div class="libraries-poster-face" style="background-image: url(../../images/cover.png);">' + inactive + '</div></a>');
+                    $(td).html('<a href="library?library_id=' + rowData['library_id'] + '"><div class="libraries-poster-face" style="background-image: url(../../images/cover.png);"></div></a>');
                 }
             },
             "orderable": false,
@@ -63,12 +57,23 @@ libraries_list_table_options = {
             "className": "libraries-thumbs"
         },
         {
-            "targets": [2],
+            "targets": "server_name",
+            "data": "server_name",
+            "createdCell": function (td, cellData, rowData, row, col) {
+                if (cellData !== null && cellData !== '') {
+                    $(td).html(cellData);
+                }
+            },
+            "width": "8%",
+            "className": "no-wrap"
+        },
+        {
+            "targets": "section_name",
             "data": "section_name",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
-                    $(td).html('<div data-id="' + rowData['row_id'] + '">' +
-                        '<a href="' + page('library', rowData['section_id']) + '">' + cellData + '</a>' +
+                    $(td).html('<div data-id="' + rowData['library_id'] + '">' +
+                        '<a href="library?library_id=' + rowData['library_id'] + '">' + cellData + '</a>' +
                         '</div>');
                 } else {
                     $(td).html('n/a');
@@ -78,7 +83,7 @@ libraries_list_table_options = {
             "className": "no-wrap"
         },
         {
-            "targets": [3],
+            "targets": "section_type",
             "data": "section_type",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
@@ -89,7 +94,7 @@ libraries_list_table_options = {
             "className": "no-wrap"
         },
         {
-            "targets": [4],
+            "targets": "count",
             "data": "count",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
@@ -101,7 +106,7 @@ libraries_list_table_options = {
             "className": "no-wrap"
         },
         {
-            "targets": [5],
+            "targets": "parent_count",
             "data": "parent_count",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
@@ -113,7 +118,7 @@ libraries_list_table_options = {
             "className": "no-wrap"
         },
         {
-            "targets": [6],
+            "targets": "child_count",
             "data": "child_count",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
@@ -125,7 +130,7 @@ libraries_list_table_options = {
             "className": "no-wrap"
         },
         {
-            "targets": [7],
+            "targets": "last_accessed",
             "data": "last_accessed",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
@@ -139,38 +144,49 @@ libraries_list_table_options = {
             "className": "no-wrap"
         },
         {
-            "targets": [8],
+            "targets": "last_played",
             "data":"last_played",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
-                    var icon = '';
-                    var icon_title = '';
                     var parent_info = '';
                     var media_type = '';
                     var thumb_popover = '';
-                    var fallback = (rowData['live']) ? 'poster-live' : 'poster';
                     if (rowData['media_type'] === 'movie') {
-                        icon = (rowData['live']) ? 'fa-broadcast-tower' : 'fa-film';
-                        icon_title = (rowData['live']) ? 'Live TV' : 'Movie';
-                        if (rowData['year']) { parent_info = ' (' + rowData['year'] + ')'; }
-                        media_type = '<span class="media-type-tooltip" data-toggle="tooltip" title="' + icon_title + '"><i class="fa ' + icon + ' fa-fw"></i></span>';
-                        thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="' + page('pms_image_proxy', rowData['thumb'], rowData['rating_key'], 300, 450, null, null, null, fallback) + '" data-height="120" data-width="80">' + cellData + parent_info + '</span>';
-                        $(td).html('<div class="history-title"><a href="' + page('info', rowData['rating_key'], rowData['guid'], true, rowData['live']) + '"><div style="float: left;">' + media_type + '&nbsp;' + thumb_popover + '</div></a></div>');
+                        media_type = '<span class="media-type-tooltip" data-toggle="tooltip" title="Movie"><i class="fa fa-film fa-fw"></i></span>';
+                        if (rowData['rating_key']) {
+                            if (rowData['year']) { parent_info = ' (' + rowData['year'] + ')'; }
+                            thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="pms_image_proxy?server_id=' + rowData['server_id'] + '&img=' + rowData['thumb'] + '&width=300&height=450&fallback=poster" data-height="120" data-width="80">' + cellData + parent_info + '</span>'
+                            $(td).html('<div class="history-title"><a href="info?source=history&id=' + rowData['library_id'] + '"><div style="float: left;">' + media_type + '&nbsp;' + thumb_popover + '</div></a></div>');
+                        } else {
+                            thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="images/poster.png" data-height="120" data-width="80">' + cellData + parent_info + '</span>'
+                            $(td).html('<div class="history-title"><div style="float: left;">' + media_type + '&nbsp;' + thumb_popover + '</div></div>');
+                        }
                     } else if (rowData['media_type'] === 'episode') {
-                        icon = (rowData['live']) ? 'fa-broadcast-tower' : 'fa-television';
-                        icon_title = (rowData['live']) ? 'Live TV' : 'Episode';
-                        if (!isNaN(parseInt(rowData['parent_media_index'])) && !isNaN(parseInt(rowData['media_index']))) { parent_info = ' (' + short_season(rowData['parent_title']) + ' &middot; E' + rowData['media_index'] + ')'; }
-                        else if (rowData['live'] && rowData['originally_available_at']) { parent_info = ' (' + rowData['originally_available_at'] + ')'; }
-                        media_type = '<span class="media-type-tooltip" data-toggle="tooltip" title="' + icon_title + '"><i class="fa ' + icon + ' fa-fw"></i></span>';
-                        thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="' + page('pms_image_proxy', rowData['thumb'], rowData['rating_key'], 300, 450, null, null, null, fallback) + '" data-height="120" data-width="80">' + cellData + parent_info + '</span>';
-                        $(td).html('<div class="history-title"><a href="' + page('info', rowData['rating_key'], rowData['guid'], true, rowData['live']) + '"><div style="float: left;" >' + media_type + '&nbsp;' + thumb_popover + '</div></a></div>');
+                        media_type = '<span class="media-type-tooltip" data-toggle="tooltip" title="Episode"><i class="fa fa-television fa-fw"></i></span>';
+                        if (rowData['rating_key']) {
+                            if (rowData['parent_media_index'] && rowData['media_index']) { parent_info = ' (S' + rowData['parent_media_index'] + '&middot; E' + rowData['media_index'] + ')'; }
+                            thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="pms_image_proxy?server_id=' + rowData['server_id'] + '&img=' + rowData['thumb'] + '&width=300&height=450&fallback=poster" data-height="120" data-width="80">' + cellData + parent_info + '</span>'
+                            $(td).html('<div class="history-title"><a href="info?source=history&id=' + rowData['library_id'] + '"><div style="float: left;" >' + media_type + '&nbsp;' + thumb_popover + '</div></a></div>');
+                        } else {
+                            thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="images/poster.png" data-height="120" data-width="80">' + cellData + parent_info + '</span>'
+                            $(td).html('<div class="history-title"><div style="float: left;" >' + media_type + '&nbsp;' + thumb_popover + '</div></div>');
+                        }
                     } else if (rowData['media_type'] === 'track') {
-                        if (rowData['parent_title']) { parent_info = ' (' + rowData['parent_title'] + ')'; }
                         media_type = '<span class="media-type-tooltip" data-toggle="tooltip" title="Track"><i class="fa fa-music fa-fw"></i></span>';
-                        thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="' + page('pms_image_proxy', rowData['thumb'], rowData['rating_key'], 300, 300, null, null, null, 'cover') + '" data-height="80" data-width="80">' + cellData + parent_info + '</span>';
-                        $(td).html('<div class="history-title"><a href="' + page('info', rowData['rating_key'], rowData['guid'], true, rowData['live']) + '"><div style="float: left;">' + media_type + '&nbsp;' + thumb_popover + '</div></a></div>');
+                        if (rowData['rating_key']) {
+                            if (rowData['parent_title']) { parent_info = ' (' + rowData['parent_title'] + ')'; }
+                            thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="pms_image_proxy?server_id=' + rowData['server_id'] + '&img=' + rowData['thumb'] + '&width=300&height=300&fallback=cover" data-height="80" data-width="80">' + cellData + parent_info + '</span>'
+                            $(td).html('<div class="history-title"><a href="info?source=history&id=' + rowData['library_id'] + '"><div style="float: left;">' + media_type + '&nbsp;' + thumb_popover + '</div></a></div>');
+                        } else {
+                            thumb_popover = '<span class="thumb-tooltip" data-toggle="popover" data-img="images/cover.png" data-height="80" data-width="80">' + cellData + parent_info + '</span>'
+                            $(td).html('<div class="history-title"><div style="float: left;">' + media_type + '&nbsp;' + thumb_popover + '</div></div>');
+                        }
                     } else if (rowData['media_type']) {
-                        $(td).html('<a href="' + page('info', rowData['rating_key']) + '">' + cellData + '</a>');
+                        if (rowData['rating_key']) {
+                            $(td).html('<a href="info?server_id=' + rowData['server_id'] + '&rating_key=' + rowData['rating_key'] + '">' + cellData + '</a>');
+                        } else {
+                            $(td).html(cellData);
+                        }
                     }
                 } else {
                     $(td).html('n/a');
@@ -180,7 +196,7 @@ libraries_list_table_options = {
             "className": "datatable-wrap"
         },
         {
-            "targets": [9],
+            "targets": "plays",
             "data": "plays",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
@@ -192,18 +208,17 @@ libraries_list_table_options = {
             "className": "no-wrap"
         },
         {
-            "targets": [10],
+            "targets": "duration",
             "data": "duration",
             "createdCell": function (td, cellData, rowData, row, col) {
                 if (cellData !== null && cellData !== '') {
-                    $(td).html(humanDuration(cellData, 'dhm', 's', false));
+                    $(td).html(humanTimeClean(cellData));
                 }
             },
             "searchable": false,
             "width": "10%",
             "className": "no-wrap"
-        }
-
+        },
     ],
     "drawCallback": function (settings) {
         // Jump to top of page
@@ -218,7 +233,6 @@ libraries_list_table_options = {
         $('body').popover({
             selector: '[data-toggle="popover"]',
             html: true,
-            sanitize: false,
             container: 'body',
             trigger: 'hover',
             placement: 'right',
@@ -239,11 +253,11 @@ libraries_list_table_options = {
         showMsg(msg, false, false, 0)
     },
     "rowCallback": function (row, rowData) {
-        if ($.inArray(rowData['row_id'], libraries_to_delete) !== -1) {
-            $(row).find('button.delete-library[data-id="' + rowData['row_id'] + '"]').toggleClass('btn-warning').toggleClass('btn-danger');
+        if ($.inArray(rowData['library_id'], libraries_to_delete) !== -1) {
+            $(row).find('button.delete-library[data-id="' + rowData['library_id'] + '"]').toggleClass('btn-warning').toggleClass('btn-danger');
         }
-        if ($.inArray(rowData['row_id'], libraries_to_purge) !== -1) {
-            $(row).find('button.purge-library[data-id="' + rowData['row_id'] + '"]').toggleClass('btn-warning').toggleClass('btn-danger');
+        if ($.inArray(rowData['library_id'], libraries_to_purge) !== -1) {
+            $(row).find('button.purge-library[data-id="' + rowData['library_id'] + '"]').toggleClass('btn-warning').toggleClass('btn-danger');
         }
     }
 }
@@ -254,7 +268,7 @@ $('#libraries_list_table').on('change', 'td.edit-control > .edit-library-toggles
     var rowData = row.data();
 
     var keep_history = 0;
-    if ($('#keep_history-' + rowData['section_id']).is(':checked')) {
+    if ($('#keep_history-' + rowData['library_id']).is(':checked')) {
         keep_history = 1;
     }
     if (rowData['custom_thumb']) {
@@ -266,7 +280,7 @@ $('#libraries_list_table').on('change', 'td.edit-control > .edit-library-toggles
     $.ajax({
         url: 'edit_library',
         data: {
-            section_id: rowData['section_id'],
+            library_id: rowData['library_id'],
             keep_history: keep_history,
             custom_thumb: custom_thumb
         },
@@ -284,11 +298,11 @@ $('#libraries_list_table').on('click', 'td.edit-control > .edit-library-toggles 
     var row = libraries_list_table.row(tr);
     var rowData = row.data();
 
-    var index_delete = $.inArray(rowData['row_id'], libraries_to_delete);
-    var index_purge = $.inArray(rowData['row_id'], libraries_to_purge);
+    var index_delete = $.inArray(rowData['library_id'], libraries_to_delete);
+    var index_purge = $.inArray(rowData['library_id'], libraries_to_purge);
 
     if (index_delete === -1) {
-        libraries_to_delete.push(rowData['row_id']);
+        libraries_to_delete.push(rowData['library_id']);
         if (index_purge === -1) {
             tr.find('button.purge-library').click();
         }
@@ -307,11 +321,11 @@ $('#libraries_list_table').on('click', 'td.edit-control > .edit-library-toggles 
     var row = libraries_list_table.row(tr);
     var rowData = row.data();
 
-    var index_delete = $.inArray(rowData['row_id'], libraries_to_delete);
-    var index_purge = $.inArray(rowData['row_id'], libraries_to_purge);
+    var index_delete = $.inArray(rowData['library_id'], libraries_to_delete);
+    var index_purge = $.inArray(rowData['library_id'], libraries_to_purge);
 
     if (index_purge === -1) {
-        libraries_to_purge.push(rowData['row_id']);
+        libraries_to_purge.push(rowData['library_id']);
     } else {
         libraries_to_purge.splice(index_purge, 1);
         if (index_delete != -1) {

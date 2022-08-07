@@ -24,20 +24,16 @@
 #    - The example settings in this file assume that Tautulli is installed to: /opt/Tautulli
 #
 #    - To create this user and give it ownership of the Tautulli directory:
-#       1. Create the user:
-#           Ubuntu/Debian: sudo addgroup tautulli && sudo adduser --system --no-create-home tautulli --ingroup tautulli
-#           CentOS/Fedora: sudo adduser --system --no-create-home tautulli
-#       2. Give the user ownership of the Tautulli directory:
-#           sudo chown -R tautulli:tautulli /opt/Tautulli
+#       Ubuntu/Debian: sudo addgroup tautulli && sudo adduser --system --no-create-home tautulli --ingroup tautulli
+#       CentOS/Fedora: sudo adduser --system --no-create-home tautulli
+#       sudo chown tautulli:tautulli -R /opt/Tautulli
 #
 #    - Adjust ExecStart= to point to:
-#       1. Your Python interpreter (get the path with "command -v python3")
-#          - Default: /usr/bin/python3
-#       2. Your Tautulli executable
+#       1. Your Tautulli executable
 #          - Default: /opt/Tautulli/Tautulli.py
-#       3. Your config file (recommended is to put it somewhere in /etc)
+#       2. Your config file (recommended is to put it somewhere in /etc)
 #          - Default: --config /opt/Tautulli/config.ini
-#       4. Your datadir (recommended is to NOT put it in your Tautulli exec dir)
+#       3. Your datadir (recommended is to NOT put it in your Tautulli exec dir)
 #          - Default: --datadir /opt/Tautulli
 #
 #    - Adjust User= and Group= to the user/group you want Tautulli to run as.
@@ -52,13 +48,11 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 /opt/Tautulli/Tautulli.py --config /opt/Tautulli/config.ini --datadir /opt/Tautulli --quiet --nolaunch
+ExecStart=/opt/Tautulli/bin/python3 /opt/Tautulli/Tautulli.py --config /opt/Tautulli/config.ini --datadir /opt/Tautulli --quiet --daemon --nolaunch
+GuessMainPID=no
+Type=forking
 User=tautulli
 Group=tautulli
-Restart=on-abnormal
-RestartSec=5
-StartLimitInterval=90
-StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target

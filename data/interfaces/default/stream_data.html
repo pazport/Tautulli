@@ -96,8 +96,8 @@ DOCUMENTATION :: END
                     % if data['media_type'] != 'track':
                     <tr>
                         <td>Resolution</td>
-                        <td>${data['stream_video_full_resolution']}</td>
-                        <td>${data['video_full_resolution']}</td>
+                        <td>${VIDEO_RESOLUTION_OVERRIDES.get(data['stream_video_resolution'], data['stream_video_resolution'])}</td>
+                        <td>${VIDEO_RESOLUTION_OVERRIDES.get(data['video_resolution'], data['video_resolution'])}</td>
                     </tr>
                     % endif
                     <tr>
@@ -179,11 +179,6 @@ DOCUMENTATION :: END
                         <td>${data['video_framerate']}</td>
                     </tr>
                     <tr>
-                        <td>Dynamic Range</td>
-                        <td>${data['stream_video_dynamic_range']}</td>
-                        <td>${data['video_dynamic_range']}</td>
-                    </tr>
-                    <tr>
                         <td>Aspect Ratio</td>
                         <td>-</td>
                         <td>${data['aspect_ratio']}</td>
@@ -218,13 +213,6 @@ DOCUMENTATION :: END
                         <td>${data['stream_audio_channels']}</td>
                         <td>${data['audio_channels']}</td>
                     </tr>
-                    % if data['stream_audio_language'] != '':
-                    <tr>
-                        <td>Language</td>
-                        <td>${data['stream_audio_language']}</td>
-                        <td>${data['audio_language']}</td>
-                    </tr>
-                    % endif
                 </tbody>
             </table>
             % if data['subtitles'] == 1:

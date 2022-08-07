@@ -10,11 +10,10 @@ DOCUMENTATION :: END
 </%doc>
 
 <%!
-    import datetime
+    import arrow
     import plexpy
-    from plexpy import common, helpers
+    from plexpy import common
 
-    scheduled_jobs = [j.id for j in plexpy.SCHED.get_jobs()]
 %>
 
 <table class="config-scheduler-table small-muted">
@@ -28,27 +27,23 @@ DOCUMENTATION :: END
         </tr>
     </thead>
     <tbody>
-        % for job, job_type in common.SCHEDULER_LIST.items():
-        % if job in scheduled_jobs:
-        <%
-            sched_job = plexpy.SCHED.get_job(job)
-            now = datetime.datetime.now(sched_job.next_run_time.tzinfo)
-        %>
+        % for job in scheduled_jobs:
+        % if job['run_interval']:
         <tr>
-            <td>${sched_job.id}</td>
+            <td>${job['name']}</td>
             <td><i class="fa fa-sm fa-fw fa-check"></i> Active</td>
-            <td>${helpers.format_timedelta_Hms(sched_job.trigger.interval)}</td>
-            <td>${helpers.format_timedelta_Hms(sched_job.next_run_time - now)}</td>
-            <td>${sched_job.next_run_time.astimezone(plexpy.SYS_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}</td>
+            <td>${arrow.get(job['run_interval']).format('HH:mm:ss')}</td>
+            <td>${arrow.get(job['next_run_interval']).format('HH:mm:ss')}</td>
+            <td>${arrow.get(job['next_run_time']).format('YYYY-MM-DD HH:mm:ss')}</td>
         </tr>
-        % elif job_type == 'websocket' and plexpy.WS_CONNECTED:
+         % elif job['name'] in ('Check for active sessions', 'Check for recently added items'):
         <tr>
-            % if job == 'Check for active sessions':
-            <td><a class="queue-modal-link no-highlight" href="#" data-queue="active sessions">${job}</a></td>
-            % elif job == 'Check for recently added items':
-            <td><a class="queue-modal-link no-highlight" href="#" data-queue="recently added">${job}</a></td>
+            % if job['name'] == 'Check for active sessions':
+            <td><a class="queue-modal-link" href="#" data-queue="active sessions">${job['name']}</a></td>
+            % elif job['name'] == 'Check for recently added items':
+            <td><a class="queue-modal-link" href="#" data-queue="recently added">${job['name']}</a></td>
             % else:
-            <td>${job}</td>
+            <td>${job['name']}</td>
             % endif
             <td><i class="fa fa-sm fa-fw fa-check"></i> Websocket</td>
             <td>N/A</td>
@@ -57,7 +52,7 @@ DOCUMENTATION :: END
         </tr>
         % else:
         <tr>
-            <td>${job}</td>
+            <td>${job['name']}</td>
             <td><i class="fa fa-sm fa-fw fa-times"></i> Inactive</td>
             <td>N/A</td>
             <td>N/A</td>
