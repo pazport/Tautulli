@@ -10,33 +10,17 @@ if (typeof platform !== 'undefined') {
 }
 
 if (['IE', 'Microsoft Edge', 'IE Mobile'].indexOf(p.name) > -1) {
-    if (!getCookie('browserDismiss')) {
-        var $browser_warning = $('<div id="browser-warning">' +
-            '<i class="fa fa-exclamation-circle"></i>&nbsp;' +
-            'Tautulli does not support Internet Explorer or Microsoft Edge! ' +
-            'Please use a different browser such as Chrome or Firefox.' +
-            '<button type="button" class="close"><i class="fa fa-remove"></i></button>' +
-            '</div>');
-        $('body').prepend($browser_warning);
-        var offset = $browser_warning.height();
-        warningOffset(offset);
-
-        $browser_warning.one('click', 'button.close', function () {
-            $browser_warning.remove();
-            warningOffset(-offset);
-            setCookie('browserDismiss', 'true', 7);
-        });
-
-        function warningOffset(offset) {
-            var navbar = $('.navbar-fixed-top');
-            if (navbar.length) {
-                navbar.offset({top: navbar.offset().top + offset});
-            }
-            var container = $('.body-container');
-            if (container.length) {
-                container.offset({top: container.offset().top + offset});
-            }
-        }
+    $('body').prepend('<div id="browser-warning"><i class="fa fa-exclamation-circle"></i>&nbsp;' +
+        'Tautulli does not support Internet Explorer or Microsoft Edge! ' +
+        'Please use a different browser such as Chrome or Firefox.</div>');
+    var offset = $('#browser-warning').height();
+    var navbar = $('.navbar-fixed-top');
+    if (navbar.length) {
+        navbar.offset({top: navbar.offset().top + offset});
+    }
+    var container = $('.body-container');
+    if (container.length) {
+        container.offset({top: container.offset().top + offset});
     }
 }
 
@@ -44,7 +28,7 @@ function initConfigCheckbox(elem, toggleElem, reverse) {
     toggleElem = (toggleElem === undefined) ? null : toggleElem;
     reverse = (reverse === undefined) ? false : reverse;
     var config = toggleElem ? $(toggleElem) : $(elem).closest('div').next();
-    config.addClass('hidden-settings');
+    config.css('overflow', 'hidden');
     if ($(elem).is(":checked")) {
         config.toggle(!reverse);
     } else {
@@ -71,9 +55,8 @@ function refreshTab() {
 function showMsg(msg, loader, timeout, ms, error) {
     var feedback = $("#ajaxMsg");
     var update = $("#updatebar");
-    var token_error = $("#token_error_bar");
-    if (update.is(":visible") || token_error.is(":visible")) {
-        var height = (update.is(":visible") ? update.height() : 0) + (token_error.is(":visible") ? token_error.height() : 0) + 35;
+    if (update.is(":visible")) {
+        var height = update.height() + 35;
         feedback.css("bottom", height + "px");
     } else {
         feedback.removeAttr("style");
@@ -102,7 +85,7 @@ function showMsg(msg, loader, timeout, ms, error) {
 function confirmAjaxCall(url, msg, data, loader_msg, callback) {
     $("#confirm-message").html(msg);
     $('#confirm-modal').modal();
-    $('#confirm-modal').off('click', '#confirm-button').one('click', '#confirm-button', function () {
+    $('#confirm-modal').one('click', '#confirm-button', function () {
         if (loader_msg) {
             showMsg(loader_msg, true, false);
         }
@@ -132,9 +115,8 @@ function doAjaxCall(url, elem, reload, form, showMsg, callback) {
     // Set Message
     var feedback = (showMsg) ? $("#ajaxMsg") : $();
     var update = $("#updatebar");
-    var token_error = $("#token_error_bar");
-    if (update.is(":visible") || token_error.is(":visible")) {
-        var height = (update.is(":visible") ? update.height() : 0) + (token_error.is(":visible") ? token_error.height() : 0) + 35;
+    if (update.is(":visible")) {
+        var height = update.height() + 35;
         feedback.css("bottom", height + "px");
     } else {
         feedback.removeAttr("style");
@@ -147,7 +129,13 @@ function doAjaxCall(url, elem, reload, form, showMsg, callback) {
         dataString = $(formID).serialize();
     }
     // Loader Image
-    var loader = $("<div class='msg ajaxLoader-" + url +"'><i class='fa fa-refresh fa-spin'></i>&nbsp; Saving...</div>");
+    // Data Success Message
+    var dataLoader = $(elem).data('loader');
+    if (typeof dataLoader === "undefined") {
+        // Standard Message when variable is not set
+        dataLoader = "Saving...";
+    }
+    var loader = $("<div class='msg ajaxLoader-" + url +"'><i class='fa fa-refresh fa-spin'></i>&nbsp;" + dataLoader + "</div>");
     // Data Success Message
     var dataSucces = $(elem).data('success');
     if (typeof dataSucces === "undefined") {
@@ -239,27 +227,6 @@ function doAjaxCall(url, elem, reload, form, showMsg, callback) {
     });
 }
 
-getBrowsePath = function (key, path, filter_ext) {
-    var deferred = $.Deferred();
-
-    $.ajax({
-        url: 'browse_path',
-        type: 'GET',
-        data: {
-            key: key,
-            path: path,
-            filter_ext: filter_ext
-        },
-        success: function(data) {
-            deferred.resolve(data);
-        },
-        error: function() {
-            deferred.reject();
-        }
-    });
-    return deferred;
-};
-
 function doSimpleAjaxCall(url) {
     $.ajax(url);
 }
@@ -270,60 +237,94 @@ function resetFilters(text) {
     }
 }
 
+$.cachedScript = function (url) {
+    return $.ajax({
+        dataType: "script",
+        cache: true,
+        url: url
+    });
+};
+
 function isPrivateIP(ip_address) {
     var defer = $.Deferred();
 
-    if (ipaddr.isValid(ip_address)) {
-        var addr = ipaddr.process(ip_address);
-        if (addr.range() === 'loopback' || addr.range() === 'private' || addr.range() === 'linkLocal') {
-            defer.resolve();
+    $.cachedScript('js/ipaddr.min.js').done(function () {
+        if (ipaddr.isValid(ip_address)) {
+            var addr = ipaddr.process(ip_address);
+
+            var rangeList = [];
+            if (addr.kind() === 'ipv4') {
+                rangeList = [
+                    ipaddr.parseCIDR('127.0.0.0/8'),
+                    ipaddr.parseCIDR('10.0.0.0/8'),
+                    ipaddr.parseCIDR('172.16.0.0/12'),
+                    ipaddr.parseCIDR('192.168.0.0/16')
+                ];
+            } else {
+                rangeList = [
+                    ipaddr.parseCIDR('fd00::/8')
+                ];
+            }
+
+            if (ipaddr.subnetMatch(addr, rangeList, -1) >= 0) {
+                defer.resolve();
+            } else {
+                defer.reject();
+            }
         } else {
-            defer.reject();
+            defer.resolve('n/a');
         }
-    } else {
-        defer.resolve('n/a');
-    }
+    });
 
     return defer.promise();
 }
 
 function humanTime(seconds) {
-    var d = Math.floor(moment.duration(seconds, 'seconds').asDays());
-    var h = Math.floor(moment.duration((seconds % 86400), 'seconds').asHours());
-    var m = Math.round(moment.duration(((seconds % 86400) % 3600), 'seconds').asMinutes());
-
-    var text = '';
-    if (d > 0) {
-        text = '<h3>' + d + '</h3><p> day' + ((d > 1) ? 's' : '') + '</p>'
-             + '<h3>' + h + '</h3><p> hr' + ((h > 1) ? 's' : '') + '</p>'
-             + '<h3>' + m + '</h3><p> min' + ((m > 1) ? 's' : '') + '</p>';
-    } else if (h > 0) {
-        text = '<h3>' + h + '</h3><p> hr' + ((h > 1) ? 's' : '') + '</p>'
-             + '<h3>' + m + '</h3><p> min' + ((m > 1) ? 's' : '') + '</p>';
+    var text;
+    if (seconds >= 86400) {
+        text = '<h3>' + Math.floor(moment.duration(seconds, 'seconds').asDays()) + '</h3><p> days</p>' + '<h3>' +
+            Math.floor(moment.duration((seconds % 86400), 'seconds').asHours()) + '</h3><p> hrs</p>' + '<h3>' +
+            Math.floor(moment.duration(((seconds % 86400) % 3600), 'seconds').asMinutes()) + '</h3><p> mins</p>';
+        return text;
+    } else if (seconds >= 3600) {
+        text = '<h3>' + Math.floor(moment.duration((seconds % 86400), 'seconds').asHours()) + '</h3><p> hrs</p>' +
+            '<h3>' + Math.floor(moment.duration(((seconds % 86400) % 3600), 'seconds').asMinutes()) +
+            '</h3><p> mins</p>';
+        return text;
+    } else if (seconds >= 60) {
+        text = '<h3>' + Math.floor(moment.duration(((seconds % 86400) % 3600), 'seconds').asMinutes()) +
+            '</h3><p> mins</p>';
+        return text;
     } else {
-        text = '<h3>' + m + '</h3><p> min' + ((m > 1) ? 's' : '') + '</p>';
+        text = '<h3>0</h3><p> mins</p>';
+        return text;
     }
-
-    return text
 }
 
+function humanTimeClean(seconds) {
+    var text;
+    if (seconds >= 86400) {
+        text = Math.floor(moment.duration(seconds, 'seconds').asDays()) + ' days ' + Math.floor(moment.duration((
+            seconds % 86400), 'seconds').asHours()) + ' hrs ' + Math.floor(moment.duration(
+            ((seconds % 86400) % 3600), 'seconds').asMinutes()) + ' mins';
+        return text;
+    } else if (seconds >= 3600) {
+        text = Math.floor(moment.duration((seconds % 86400), 'seconds').asHours()) + ' hrs ' + Math.floor(moment.duration(
+            ((seconds % 86400) % 3600), 'seconds').asMinutes()) + ' mins';
+        return text;
+    } else if (seconds >= 60) {
+        text = Math.floor(moment.duration(((seconds % 86400) % 3600), 'seconds').asMinutes()) + ' mins';
+        return text;
+    } else {
+        text = '0';
+        return text;
+    }
+}
 String.prototype.toProperCase = function () {
     return this.replace(/\w\S*/g, function (txt) {
         return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
     });
 };
-
-function getPercent(value1, value2) {
-    value1 = parseFloat(value1) | 0
-    value2 = parseFloat(value2) | 0
-
-    var percent = 0;
-    if (value1 !== 0 && value2 !== 0) {
-        percent = (value1 / value2) * 100
-    }
-
-    return Math.round(percent)
-}
 
 function millisecondsToMinutes(ms, roundToMinute) {
     if (ms > 0) {
@@ -342,61 +343,6 @@ function millisecondsToMinutes(ms, roundToMinute) {
         }
     }
 }
-
-function humanDuration(ms, sig='dhm', units='ms', return_seconds=300000) {
-    var factors = {
-        d: 86400000,
-        h: 3600000,
-        m: 60000,
-        s: 1000,
-        ms: 1
-    }
-
-    ms = parseInt(ms);
-    var d, h, m, s;
-
-    if (ms > 0) {
-        if (return_seconds && ms < return_seconds) {
-            sig = 'dhms'
-        }
-
-        ms = ms * factors[units];
-
-        h =  ms % factors['d'];
-        d = Math.trunc(ms / factors['d']);
-
-        m = h % factors['h'];
-        h = Math.trunc(h / factors['h']);
-
-        s = m % factors['m'];
-        m = Math.trunc(m / factors['m']);
-
-        ms = s % factors['s'];
-        s = Math.trunc(s / factors['s']);
-
-        var hd_list = [];
-        if (sig >= 'd' && d > 0) {
-            d = (sig === 'd' && h >= 12) ? d + 1 : d;
-            hd_list.push(d.toString() + ' day' + ((d > 1) ? 's' : ''));
-        }
-        if (sig >= 'dh' && h > 0) {
-            h = (sig === 'dh' && m >= 30) ? h + 1 : h;
-            hd_list.push(h.toString() + ' hr' + ((h > 1) ? 's' : ''));
-        }
-        if (sig >= 'dhm' && m > 0) {
-            m = (sig === 'dhm' && s >= 30) ? m + 1 : m;
-            hd_list.push(m.toString() + ' min' + ((m > 1) ? 's' : ''));
-        }
-        if (sig >= 'dhms' && s > 0) {
-            hd_list.push(s.toString() + ' sec' + ((s > 1) ? 's' : ''));
-        }
-
-        return hd_list.join(' ')
-    } else {
-        return '0'
-    }
-}
-
 // Our countdown plugin takes a callback, a duration, and an optional message
 $.fn.countdown = function (callback, duration, message) {
     // If no message is provided, we use an empty string
@@ -493,26 +439,22 @@ $('*').on('click', '.refresh_pms_image', function (e) {
     pms_proxy_url = /^url\((['"]?)(.*)\1\)$/.exec(pms_proxy_url);
     pms_proxy_url = pms_proxy_url ? pms_proxy_url[2] : ""; // If matched, retrieve url, otherwise ""
 
-    if (pms_proxy_url.indexOf('pms_image_proxy') === -1) {
+    if (pms_proxy_url.indexOf('pms_image_proxy') == -1) {
         console.log('PMS image proxy url not found.');
     } else {
-        background_div.css('background-image', 'none')
-        $.ajax({
-            url: pms_proxy_url,
-            headers: {
-                'Cache-Control': 'no-cache'
-            },
-            success: function () {
-                background_div.css('background-image', 'url(' + pms_proxy_url + ')');
-            }
-        });
+        if (pms_proxy_url.indexOf('refresh=true') > -1) {
+            pms_proxy_url = pms_proxy_url.replace("&refresh=true", "");
+            background_div.css('background-image', 'url(' + pms_proxy_url + ')');
+            background_div.css('background-image', 'url(' + pms_proxy_url + '&refresh=true)');
+        } else {
+            background_div.css('background-image', 'url(' + pms_proxy_url + '&refresh=true)');
+        }
     }
 });
 
 // Taken from http://stackoverflow.com/questions/10420352/converting-file-size-in-bytes-to-human-readable#answer-14919494
-function humanFileSize(bytes, si = true) {
-    //var thresh = si ? 1000 : 1024;
-    var thresh = 1024;  // Always divide by 2^10 but display SI units
+function humanFileSize(bytes, si) {
+    var thresh = si ? 1000 : 1024;
     if (Math.abs(bytes) < thresh) {
         return bytes + ' B';
     }
@@ -554,10 +496,13 @@ $.fn.slideToggleBool = function(bool, options) {
   return bool ? $(this).slideDown(options) : $(this).slideUp(options);
 };
 
-function openPlexXML(endpoint, plextv, params) {
-    var data = $.extend({endpoint: endpoint, plextv: plextv || false}, params);
-    var query = new URLSearchParams(data)
-    window.open('open_plex_xml?' + query.toString(), '_blank');
+function openPlexXML(endpoint, plextv, server_id, params) {
+    var data = $.extend({endpoint: endpoint, plextv: plextv, server_id: server_id}, params);
+    $.getJSON('return_plex_xml_url', data, function(xml_url) {
+       xml_url.forEach(function(url) {
+        window.open(url, '_blank');
+       })
+    });
 }
 
 function PopupCenter(url, title, w, h) {
@@ -582,18 +527,16 @@ function PopupCenter(url, title, w, h) {
 
 
 function setLocalStorage(key, value, path) {
-    var key_path = key;
     if (path !== false) {
-        key_path = key_path + '_' + window.location.pathname;
+        key = key + '_' + window.location.pathname;
     }
-    localStorage.setItem(key_path, value);
+    localStorage.setItem(key, value);
 }
 function getLocalStorage(key, default_value, path) {
-    var key_path = key;
     if (path !== false) {
-        key_path = key_path + '_' + window.location.pathname;
+        key = key + '_' + window.location.pathname;
     }
-    var value = localStorage.getItem(key_path);
+    var value = localStorage.getItem(key);
     if (value !== null) {
         return value
     } else if (default_value !== undefined) {
@@ -609,21 +552,16 @@ function uuidv4() {
     });
 }
 
-function getPlexHeaders(clientID) {
-    return {
-        'Accept': 'application/json',
-        'X-Plex-Product': 'Tautulli',
-        'X-Plex-Version': 'Plex OAuth',
-        'X-Plex-Client-Identifier': clientID ? clientID : getLocalStorage('Tautulli_ClientID', uuidv4(), false),
-        'X-Plex-Platform': p.name,
-        'X-Plex-Platform-Version': p.version,
-        'X-Plex-Model': 'Plex OAuth',
-        'X-Plex-Device': p.os,
-        'X-Plex-Device-Name': p.name + ' (Tautulli)',
-        'X-Plex-Device-Screen-Resolution': window.screen.width + 'x' + window.screen.height,
-        'X-Plex-Language': 'en'
-    };
-}
+var x_plex_headers = {
+    'Accept': 'application/json',
+    'X-Plex-Product': 'Tautulli',
+    'X-Plex-Version': 'Plex OAuth',
+    'X-Plex-Client-Identifier': getLocalStorage('Tautulli_ClientID', uuidv4(), false),
+    'X-Plex-Platform': p.name,
+    'X-Plex-Platform-Version': p.version,
+    'X-Plex-Device': p.os,
+    'X-Plex-Device-Name': p.name
+};
 
 var plex_oauth_window = null;
 const plex_oauth_loader = '<style>' +
@@ -673,8 +611,7 @@ function closePlexOAuthWindow() {
     }
 }
 
-getPlexOAuthPin = function (clientID) {
-    var x_plex_headers = getPlexHeaders(clientID);
+getPlexOAuthPin = function () {
     var deferred = $.Deferred();
 
     $.ajax({
@@ -694,7 +631,7 @@ getPlexOAuthPin = function (clientID) {
 
 var polling = null;
 
-function PlexOAuth(success, error, pre, clientID) {
+function PlexOAuth(success, error, pre) {
     if (typeof pre === "function") {
         pre()
     }
@@ -702,26 +639,11 @@ function PlexOAuth(success, error, pre, clientID) {
     plex_oauth_window = PopupCenter('', 'Plex-OAuth', 600, 700);
     $(plex_oauth_window.document.body).html(plex_oauth_loader);
 
-    getPlexOAuthPin(clientID).then(function (data) {
-        var x_plex_headers = getPlexHeaders(clientID);
+    getPlexOAuthPin().then(function (data) {
         const pin = data.pin;
         const code = data.code;
 
-        var oauth_params = {
-            'clientID': x_plex_headers['X-Plex-Client-Identifier'],
-            'context[device][product]': x_plex_headers['X-Plex-Product'],
-            'context[device][version]': x_plex_headers['X-Plex-Version'],
-            'context[device][platform]': x_plex_headers['X-Plex-Platform'],
-            'context[device][platformVersion]': x_plex_headers['X-Plex-Platform-Version'],
-            'context[device][device]': x_plex_headers['X-Plex-Device'],
-            'context[device][deviceName]': x_plex_headers['X-Plex-Device-Name'],
-            'context[device][model]': x_plex_headers['X-Plex-Model'],
-            'context[device][screenResolution]': x_plex_headers['X-Plex-Device-Screen-Resolution'],
-            'context[device][layout]': 'desktop',
-            'code': code
-        }
-
-        plex_oauth_window.location = 'https://app.plex.tv/auth/#!?' + encodeData(oauth_params);
+        plex_oauth_window.location = 'https://app.plex.tv/auth/#!?clientID=' + x_plex_headers['X-Plex-Client-Identifier'] + '&code=' + code;
         polling = pin;
 
         (function poll() {
@@ -759,173 +681,4 @@ function PlexOAuth(success, error, pre, clientID) {
             error()
         }
     });
-}
-
-function encodeData(data) {
-    return Object.keys(data).map(function(key) {
-        return [key, data[key]].map(encodeURIComponent).join("=");
-    }).join("&");
-}
-
-function page(endpoint, ...args) {
-    let endpoints = {
-        'pms_image_proxy': pms_image_proxy,
-        'info': info_page,
-        'library': library_page,
-        'user': user_page
-    };
-
-    var params = {};
-
-    if (endpoint in endpoints) {
-        params = endpoints[endpoint](...args);
-    }
-
-    return endpoint + '?' + $.param(params).replace(/'/g, '%27');
-}
-
-function pms_image_proxy(img, rating_key, width, height, opacity, background, blur, fallback, refresh, clip, img_format) {
-    var params = {};
-
-    if (img != null) { params.img = img; }
-    if (rating_key != null) { params.rating_key = rating_key; }
-    if (width != null) { params.width = width; }
-    if (height != null) { params.height = height; }
-    if (opacity != null) { params.opacity = opacity; }
-    if (background != null) { params.background = background; }
-    if (blur != null) { params.blur = blur; }
-    if (fallback != null) { params.fallback = fallback; }
-    if (refresh != null) { params.refresh = true; }
-    if (clip != null) { params.clip = true; }
-    if (img_format != null) { params.img_format = img_format; }
-
-    return params;
-}
-
-function info_page(rating_key, guid, history, live) {
-    var params = {};
-
-    if (live && history) {
-        params.guid = guid;
-    } else {
-        params.rating_key = rating_key;
-    }
-
-    if (history) { params.source = 'history'; }
-
-    return params;
-}
-
-function library_page(section_id) {
-    var params = {};
-
-    if (section_id != null) { params.section_id = section_id; }
-
-    return params;
-}
-
-function user_page(user_id, user) {
-    var params = {};
-
-    if (user_id != null) { params.user_id = user_id; }
-    if (user != null) { params.user = user; }
-
-    return params;
-}
-
-MEDIA_TYPE_HEADERS = {
-    'movie': 'Movies',
-    'show': 'TV Shows',
-    'season': 'Seasons',
-    'episode': 'Episodes',
-    'artist': 'Artists',
-    'album': 'Albums',
-    'track': 'Tracks',
-    'video': 'Videos',
-    'audio': 'Tracks',
-    'photo': 'Photos'
-}
-
-function short_season(title) {
-    if (title.startsWith('Season ') && /^\d+$/.test(title.substring(7))) {
-        return 'S' + title.substring(7)
-    }
-    return title
-}
-
-function loadAllBlurHash() {
-    $('[data-blurhash]').each(function() {
-        const elem = $(this);
-        const src = elem.data('blurhash');
-        loadBlurHash(elem, src);
-    });
-}
-
-function loadBlurHash(elem, src) {
-    const img = new Image();
-    img.src = src;
-    img.onload = () => {
-        const imgData = blurhash.getImageData(img);
-
-        blurhash
-            .encodePromise(imgData, img.width, img.height, 4, 4)
-            .then(hash => {
-                return blurhash.decodePromise(
-                    hash,
-                    img.width,
-                    img.height
-                );
-            })
-            .then(blurhashImgData => {
-                const imgObject = blurhash.getImageDataAsImage(
-                    blurhashImgData,
-                    img.width,
-                    img.height,
-                    (event, imgObject) => {
-                        elem.css('background-image', 'url(' + imgObject.src + ')')
-                    }
-                );
-            });
-    }
-}
-
-function _toggleRevealToken(elem, click) {
-    var input = elem.parent().siblings('input');
-    if ((input.prop('type') === 'password' && click) || !input.val()) {
-        input.prop('type', 'text');
-        elem.children('.fa').removeClass('fa-eye-slash').addClass('fa-eye');
-    } else {
-        input.prop('type', 'password');
-        elem.children('.fa').removeClass('fa-eye').addClass('fa-eye-slash');
-    }
-}
-function toggleRevealTokens() {
-    $('.reveal-token').each(function () {
-        _toggleRevealToken($(this));
-    });
-}
-
-$('body').on('click', '.reveal-token', function() {
-    _toggleRevealToken($(this), true);
-});
-
-// https://stackoverflow.com/a/57414592
-// prevent modal close when click starts in modal and ends on backdrop
-$(document).on('mousedown', '.modal', function(e){
-    window.clickStartedInModal = $(e.target).is('.modal-dialog *');
-});
-$(document).on('mouseup', '.modal', function(e){
-    if(!$(e.target).is('.modal-dialog *') && window.clickStartedInModal) {
-        window.preventModalClose = true;
-    }
-});
-$('.modal').on('hide.bs.modal', function (e) {
-    if(window.preventModalClose){
-        window.preventModalClose = false;
-        return false;
-    }
-});
-
-$.fn.hasScrollBar = function() {
-    return this.get(0).scrollHeight > this.get(0).clientHeight;
 }

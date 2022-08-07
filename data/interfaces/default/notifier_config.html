@@ -1,9 +1,9 @@
 % if notifier:
-<%
+<%!
     import json
     from plexpy import notifiers, users
     from plexpy.helpers import checked
-    available_notification_actions = notifiers.available_notification_actions(agent_id=notifier['agent_id'])
+    available_notification_actions = notifiers.available_notification_actions()
 
     user_emails = [{'user': u['friendly_name'] or u['username'], 'email': u['email']} for u in users.Users().get_users() if u['email']]
     sorted(user_emails, key=lambda u: u['user'])
@@ -25,7 +25,7 @@
                         <li role="presentation"><a href="#tabs-notify_text" aria-controls="tabs-notify_text" role="tab" data-toggle="tab">Arguments</a></li>
                         % elif notifier['agent_name'] == 'webhook':
                         <li role="presentation"><a href="#tabs-notify_text" aria-controls="tabs-notify_text" role="tab" data-toggle="tab">Data</a></li>
-                        % elif notifier['agent_name'] != 'plexmobileapp':
+                        % else:
                         <li role="presentation"><a href="#tabs-notify_text" aria-controls="tabs-notify_text" role="tab" data-toggle="tab">Text</a></li>
                         % endif
                         <li role="presentation"><a href="#tabs-test_notifications" aria-controls="tabs-test_notifications" role="tab" data-toggle="tab">Test Notifications</a></li>
@@ -49,31 +49,7 @@
                                         <label for="${item['name']}">${item['label']}</label>
                                         <div class="row">
                                             <div class="col-md-12">
-                                                % if notifier['agent_name'] == 'scripts' and item['name'] == 'scripts_script_folder':
-                                                <div class="input-group">
-                                                    <input type="${item['input_type']}" class="form-control" id="${item['name']}" name="${item['name']}" value="${item['value']}" size="30" ${'readonly' if item.get('readonly') else ''}>
-                                                    <span class="input-group-btn">
-                                                        <button class="btn btn-form" type="button" id="${item['name']}_browse" data-toggle="browse" data-filter=".folderonly" data-target="#${item['name']}">Browse</button>
-                                                    </span>
-                                                </div>
-                                                % else:
                                                 <input type="${item['input_type']}" class="form-control" id="${item['name']}" name="${item['name']}" value="${item['value']}" size="30" ${'readonly' if item.get('readonly') else ''}>
-                                                % endif
-                                            </div>
-                                        </div>
-                                        <p class="help-block">${item['description'] | n}</p>
-                                    </div>
-                                    % elif item['input_type'] == 'token':
-                                    <div class="form-group">
-                                        <label for="${item['name']}">${item['label']}</label>
-                                        <div class="row">
-                                            <div class="col-md-12">
-                                                <div class="input-group">
-                                                    <span class="input-group-btn">
-                                                        <button class="btn btn-form reveal-token" type="button"><i class="fa fa-eye-slash"></i></button>
-                                                    </span>
-                                                    <input type="password" class="form-control" id="${item['name']}" name="${item['name']}" value="${item['value']}" size="30" ${'readonly' if item.get('readonly') else ''}>
-                                                </div>
                                             </div>
                                         </div>
                                         <p class="help-block">${item['description'] | n}</p>
@@ -113,14 +89,10 @@
                                             <div class="col-md-12">
                                                 <select class="form-control" id="${item['name']}" name="${item['name']}">
                                                     % for key, value in sorted(item['select_options'].items()):
-                                                    % if isinstance(value, list):
-                                                    <optgroup label="${key}">
-                                                        % for option in sorted(value, key=lambda x: x['text'].lower()):
-                                                            <option value="${option['value']}" ${'selected' if option['value'] == item['value'] else ''}>${option['text']}</option>
-                                                        % endfor
-                                                    </optgroup>
+                                                    % if key == item['value']:
+                                                    <option value="${key}" selected>${value}</option>
                                                     % else:
-                                                    <option value="${key}" ${'selected' if key == item['value'] else ''}>${value}</option>
+                                                    <option value="${key}">${value}</option>
                                                     % endif
                                                     % endfor
                                                 </select>
@@ -176,7 +148,7 @@
                                 <div class="col-md-12">
                                     <label>Notification Triggers</label>
                                     <p class="help-block">
-                                        Select items that will trigger a notification for this ${notifier['agent_label']} notification agent.
+                                        Select items that will trigger a notification for this ${notifier['agent_label']} notifiation agent.
                                     </p>
                                     % for action in available_notification_actions:
                                     <div class="checkbox">
@@ -195,9 +167,6 @@
                             <p class="help-block">
                                 Add custom conditions to only <em>allow certain notifications</em>. By default, all notifications will be sent if there are no conditions.
                                 <a href="#notify-text-sub-modal" data-toggle="modal">Click here</a> for a description of all the parameters.
-                            </p>
-                            <p class="help-block">
-                                A tilde (<span class="inline-pre">~</span>) can be entered as a value to indicate an empty string.
                             </p>
                             <div id="condition-widget"></div>
                             <input type="hidden" id="custom_conditions" name="custom_conditions" />
@@ -242,7 +211,7 @@
                                 % for action in available_notification_actions:
                                 <li>
                                     <div class="link">
-                                        <span class="toggle-left"><i class="fa ${action['icon']} fa-fw"></i></span>
+                                        <span class="toggle-left"><i class="fa ${action['icon']} fa-fw"></i></span>&nbsp;
                                         ${action['label']}
                                         <span class="toggle-right"><i class="fa fa-chevron-down"></i></span>
                                     </div>
@@ -268,17 +237,12 @@
                                 % for action in available_notification_actions:
                                 <li>
                                     <div class="link">
-                                        <span class="toggle-left"><i class="fa ${action['icon']} fa-fw"></i></span>
+                                        <span class="toggle-left"><i class="fa ${action['icon']} fa-fw"></i></span>&nbsp;
                                         ${action['label']}
                                         <span class="toggle-right"><i class="fa fa-chevron-down"></i></span>
                                     </div>
                                     <ul class="submenu">
                                         <li>
-                                            <div class="form-group">
-                                                <label for="${action['name']}_subject">JSON Headers</label>
-                                                <textarea class="form-control" id="${action['name']}_subject" name="${action['name']}_subject" data-parsley-trigger="change" data-autoresize required>${notifier['notify_text'][action['name']]['subject']}</textarea>
-                                                <p class="help-block">Set custom JSON headers.</p>
-                                            </div>
                                             <div class="form-group">
                                                 <label for="${action['name']}_body">JSON Data</label>
                                                 <textarea class="form-control" id="${action['name']}_body" name="${action['name']}_body" data-parsley-trigger="change" data-autoresize required>${notifier['notify_text'][action['name']]['body']}</textarea>
@@ -299,7 +263,7 @@
                                 % for action in available_notification_actions:
                                 <li>
                                     <div class="link">
-                                        <span class="toggle-left"><i class="fa ${action['icon']} fa-fw"></i></span>
+                                        <span class="toggle-left"><i class="fa ${action['icon']} fa-fw"></i></span>&nbsp;
                                         ${action['label']}
                                         <span class="toggle-right"><i class="fa fa-chevron-down"></i></span>
                                     </div>
@@ -362,15 +326,6 @@
                                 <p class="help-block">Set custom arguments passed to the script.</p>
                             </div>
                             % elif notifier['agent_name'] == 'webhook':
-                            <div class="form-group">
-                                <label for="test_subject">JSON Headers</label>
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <textarea class="form-control" id="test_subject" name="test_subject" data-autoresize></textarea>
-                                    </div>
-                                </div>
-                                <p class="help-block">Set custom JSON headers sent to the webhook.</p>
-                            </div>
                             <div class="form-group">
                                 <label for="test_body">JSON Data</label>
                                 <div class="row">
@@ -460,7 +415,6 @@
         }
 
         getNotifiersTable();
-        toggleRevealTokens();
     }
 
     function deleteCallback() {
@@ -503,9 +457,6 @@
 
     $('#duplicate-notifier-item').click(function() {
         var msg = 'Are you sure you want to duplicate this <strong>${notifier["agent_label"]}</strong> notification agent?';
-        if ($('#set_notifier_config .form-control[id$=_password]').val()) {
-            msg += '<br><br>Note: Saved passwords will not be copied over and must be re-entered.';
-        }
         var url = 'add_notifier_config';
         confirmAjaxCall(url, msg, { agent_id: '${notifier["agent_id"]}' }, null, duplicateCallback);
     });
@@ -520,7 +471,7 @@
             '<div class="form-group">' +
             '<label>Warning</label>' +
             '<p class="help-block" style="color: #eb8600;">Facebook requires HTTPS for authorization. ' +
-            'Please enable HTTPS for Tautulli under <a data-tab-destination="web_interface" data-dismiss="modal" data-target="enable_https">Web Interface</a>.</p>' +
+            'Please enable HTTPS for Tautulli under <a data-tab-destination="tabs-web_interface" data-dismiss="modal" data-target="#enable_https">Web Interface</a>.</p>' +
             '</div>'
         );
         $('#facebook_redirect_uri').val('HTTPS not enabled');
@@ -615,7 +566,6 @@
     var $email_selectors = $('#email_to, #email_cc, #email_bcc').selectize({
         plugins: ['remove_button'],
         maxItems: null,
-        searchField: ['text', 'value'],
         render: {
             item: function(item, escape) {
                 return '<div>' +
@@ -718,15 +668,6 @@
     $('#pushover_priority').change( function () {
         pushoverPriority();
     });
-
-    % elif notifier['agent_name'] == 'plexmobileapp':
-    var $plexmobileapp_user_ids = $('#plexmobileapp_user_ids').selectize({
-        plugins: ['remove_button'],
-        maxItems: null,
-        create: true
-    });
-    var plexmobileapp_user_ids = $plexmobileapp_user_ids[0].selectize;
-    plexmobileapp_user_ids.setValue(${json.dumps(next((c['value'] for c in notifier['config_options'] if c['name'] == 'plexmobileapp_user_ids'), [])) | n});
 
     % endif
 
@@ -888,8 +829,10 @@
                 PNotify.prototype.options.hide = true;
                 PNotify.prototype.options.delay = $('#browser_auto_hide_delay').val() * 1000;
             }
-            displayPNotify($('#test_subject').val(), $('#test_body').val());
-            showMsg('<i class="fa fa-check"></i> Notification sent.', false, true, 5000);
+            var notification = new PNotify({
+                title: $('#test_subject').val(),
+                text: $('#test_body').val()
+            });
         }
     }
 
@@ -922,8 +865,6 @@
         };
         $(this).on('focus keyup input', function () { resizeTextarea(this); }).removeAttr('data-autoresize');
     });
-
-    toggleRevealTokens();
 </script>
 % else:
 <div class="modal-dialog" role="document">

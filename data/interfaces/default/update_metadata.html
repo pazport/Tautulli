@@ -39,43 +39,30 @@ DOCUMENTATION :: END
                         <ul class="list-unstyled breadcrumb">
                             % if query['media_type'] == 'movie':
                             <li>Movies</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li class="active">${query['title']}</li>
                             % elif query['media_type'] == 'show':
                             <li>TV Shows</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li class="active">${query['grandparent_title']}</li>
                             % elif query['media_type'] == 'season':
                             <li class="hidden-xs hidden-sm">TV Shows</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li class="hidden-xs hidden-sm">${query['grandparent_title']}</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
-                            <li class="active">${query['parent_title']}</li>
+                            <li class="active">Season ${query['parent_media_index']}</li>
                             % elif query['media_type'] == 'episode':
                             <li class="hidden-xs hidden-sm">TV Shows</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li class="hidden-xs hidden-sm">${query['grandparent_title']}</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
-                            <li>${query['parent_title']}</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
+                            <li>Season ${query['parent_media_index']}</li>
                             <li class="active">Episode ${query['media_index']} - ${query['title']}</li>
                             % elif query['media_type'] == 'artist':
-                            <li>Music</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
+                            <li><Music</li>
                             <li class="active">${query['grandparent_title']}</li>
                             % elif query['media_type'] == 'album':
                             <li class="hidden-xs hidden-sm">Music</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li>${query['grandparent_title']}</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li class="active">${query['parent_title']}</li>
                             % elif query['media_type'] == 'track':
                             <li class="hidden-xs hidden-sm">Music</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li class="hidden-xs hidden-sm">${query['grandparent_title']}</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li>${query['parent_title']}</li>
-                            <span class="breadcrumb-arrow"><i class="fa fa-chevron-right"></i></span>
                             <li class="active">Track ${query['media_index']} - ${query['title']}</li>
                             % endif
                         </ul>
@@ -140,10 +127,6 @@ DOCUMENTATION :: END
 </%def>
 
 <%def name="modalIncludes()">
-% if query:
-<%
-    from plexpy.helpers import short_season
-%>
 <div class="modal fade" id="confirm-modal-update" tabindex="-1" role="dialog" aria-labelledby="confirm-modal-update">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -160,9 +143,9 @@ DOCUMENTATION :: END
                         % elif query['media_type'] == 'show':
                         ${query['grandparent_title']}
                         % elif query['media_type'] == 'season':
-                        ${query['grandparent_title']}<br />${query['parent_title']}
+                        ${query['grandparent_title']}<br />S${query['parent_media_index']}
                         % elif query['media_type'] == 'episode':
-                        ${query['grandparent_title']}<br />${query['title']}<br />${short_season(query['parent_title'])} &middot; E${query['media_index']}
+                        ${query['grandparent_title']}<br />${query['title']}<br />S${query['parent_media_index']} &middot; E${query['media_index']}
                         % elif query['media_type'] == 'artist':
                         ${query['grandparent_title']}
                         % elif query['media_type'] == 'album':
@@ -174,7 +157,6 @@ DOCUMENTATION :: END
                 </p>
                 <p> with </p>
                 <p><span id="new_title"></span></p>
-                <p>from the <strong><span id="new_library"></span></strong> library?</p>
                 % if query['media_type'] != 'movie':
                 <p>All items for <strong>${query['grandparent_title']}</strong> will also be updated.</p>
                 % endif
@@ -187,7 +169,6 @@ DOCUMENTATION :: END
         </div>
     </div>
 </div>
-% endif
 </%def>
 
 <%def name="javascriptIncludes()">
@@ -202,7 +183,6 @@ DOCUMENTATION :: END
             async: true,
             data: {
                 query: query_string,
-                limit: 30,
                 media_type: '${query["media_type"]}',
                 season_index: '${query["parent_media_index"]}'
             },
@@ -215,12 +195,10 @@ DOCUMENTATION :: END
 
     $(document).on('click', '#search-results-list a', function (e) {
         e.preventDefault();
-        var new_rating_key = $(this).data('rating_key');
-        var new_library_section = $(this).data('library_name');
+        var new_rating_key = $(this).attr('id');
         var new_href = $(this).attr('href');
 
         $('#new_title').html($(this).find('.item-children-instance-text-wrapper').html());
-        $('#new_library').text(new_library_section);
 
         $('#confirm-modal-update').modal();
         $('#confirm-modal-update').one('click', '#confirm-update', function () {
@@ -231,11 +209,11 @@ DOCUMENTATION :: END
             $.ajax({
                 url: 'update_metadata_details',
                 data: {
+                    server_id: '${query["server_id"]}',
                     old_rating_key: '${query["rating_key"]}',
                     new_rating_key: new_rating_key,
-                    media_type: '${query["media_type"]}',
-                    single_update: true
-                },
+                    media_type: '${query["media_type"]}'
+                    },
                 async: true,
                 success: function (data) {
                     window.location.href = new_href;

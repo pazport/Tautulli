@@ -21,24 +21,10 @@
                                 <p class="help-block">Optional: Enter a friendly name for this device. Leave blank for default.</p>
                             </div>
                             <div class="form-group">
-                                <label for="friendly_name">App Version</label>
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <input type="text" class="form-control" id="app_version" name="app_version" value="${device['version'] or ''}" size="30" readonly>
-                                    </div>
-                                </div>
-                                <p class="help-block">The version of the mobile app.</p>
-                          </div>
-                            <div class="form-group">
                                 <label for="friendly_name">Device Token</label>
                                 <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="input-group">
-                                            <span class="input-group-btn">
-                                                <button class="btn btn-form reveal-token" type="button"><i class="fa fa-eye-slash"></i></button>
-                                            </span>
-                                            <input type="password" class="form-control" id="device_token" value="${device['device_token']}" size="30" readonly>
-                                        </div>
+                                    <div class="col-md-8">
+                                        <input type="text" class="form-control" id="device_token" value="${device['device_token']}" size="30" readonly>
                                     </div>
                                 </div>
                                 <p class="help-block">Your app device token.</p>
@@ -46,13 +32,8 @@
                             <div class="form-group">
                                 <label for="friendly_name">OneSignal Device ID</label>
                                 <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="input-group">
-                                            <span class="input-group-btn">
-                                                <button class="btn btn-form reveal-token" type="button"><i class="fa fa-eye-slash"></i></button>
-                                            </span>
-                                            <input type="password" class="form-control" id="onesignal_id" value="${device['onesignal_id'] or ''}" size="30" readonly>
-                                        </div>
+                                    <div class="col-md-8">
+                                        <input type="text" class="form-control" id="device_id" value="${device['device_id']}" size="30" readonly>
                                     </div>
                                 </div>
                                 <p class="help-block">Your OneSignal device ID for notifications.</p>
@@ -96,7 +77,6 @@
         }
 
         getMobileDevicesTable();
-        toggleRevealTokens();
     }
 
     function deleteCallback() {
@@ -132,8 +112,6 @@
             $('#'+configToggle).val(0);
         }
     });
-
-    toggleRevealTokens();
 </script>
 % else:
 <div class="modal-dialog" role="document">

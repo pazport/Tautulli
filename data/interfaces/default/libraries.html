@@ -1,7 +1,7 @@
 <%inherit file="base.html"/>
 
 <%def name="headIncludes()">
-<link rel="stylesheet" href="${http_root}css/dataTables.bootstrap.min.css">
+<link rel="stylesheet" href="${http_root}css/dataTables.bootstrap.css">
 <link rel="stylesheet" href="${http_root}css/dataTables.colVis.css">
 <link rel="stylesheet" href="${http_root}css/tautulli-dataTables.css">
 </%def>
@@ -14,10 +14,11 @@
         </div>
         <div class="button-bar">
             % if _session['user_group'] == 'admin':
+            <div class="alert alert-danger alert-edit" role="alert" id="row-edit-mode-alert"><i class="fa fa-exclamation-triangle"></i>&nbspSelect libraries to delete/purge. Data is deleted/purged upon exiting edit mode.</div>
             <div class="btn-group">
                 <button class="btn btn-danger btn-edit" data-toggle="button" aria-pressed="false" autocomplete="off" id="row-edit-mode">
                     <i class="fa fa-pencil"></i> Edit mode
-                </button>
+                </button>&nbsp
             </div>
             <div class="btn-group">
                 <button class="btn btn-dark refresh-libraries-button" id="refresh-libraries-list"><i class="fa fa-refresh"></i> Refresh libraries</button>
@@ -32,15 +33,16 @@
             <tr>
                 <th align="left" id="edit_row">Edit</th>
                 <th align="right" id="library_thumb"></th>
-                <th align="left" id="section_name">Library Name</th>
-                <th align="left" id="section_type">Library Type</th>
-                <th align="left" id="count">Total Movies / TV Shows / Artists</th>
-                <th align="left" id="parent_count">Total Seasons / Albums</th>
-                <th align="left" id="child_count">Total Episodes / Tracks</th>
-                <th align="left" id="last_accessed">Last Streamed</th>
-                <th align="left" id="last_played">Last Played</th>
-                <th align="left" id="total_plays">Total Plays</th>
-                <th align="left" id="total_duration">Total Played Duration</th>
+                <th align="left" class="server_name" id="server_name">Server</th>
+                <th align="left" class="section_name" id="section_name">Library Name</th>
+                <th align="left" class="section_type" id="section_type">Library Type</th>
+                <th align="left" class="count" id="count">Total Movies / TV Shows / Artists</th>
+                <th align="left" class="parent_count" id="parent_count">Total Seasons / Albums</th>
+                <th align="left" class="child_count" id="child_count">Total Episodes / Tracks</th>
+                <th align="left" class="last_accessed" id="last_accessed">Last Accessed</th>
+                <th align="left" class="last_played" id="last_played">Last Played</th>
+                <th align="left" class="plays" id="total_plays">Total Plays</th>
+                <th align="left" class="duration" id="total_duration">Total Played Duration</th>
             </tr>
             </thead>
             <tbody>
@@ -78,6 +80,7 @@
 <script src="${http_root}js/dataTables.colVis.js"></script>
 <script src="${http_root}js/dataTables.bootstrap.min.js"></script>
 <script src="${http_root}js/dataTables.bootstrap.pagination.js"></script>
+<script src="${http_root}js/moment-with-locale.js"></script>
 <script src="${http_root}js/tables/libraries.js${cache_param}"></script>
 <script>
     $(document).ready(function () {
@@ -99,12 +102,11 @@
 
         % if _session['user_group'] == 'admin':
         $('#row-edit-mode').on('click', function () {
+            $('#row-edit-mode-alert').fadeIn(200);
             $('#libraries-to-delete').html('');
             $('#libraries-to-purge').html('');
 
             if ($(this).hasClass('active')) {
-                $(this).tooltip('destroy');
-
                 if (libraries_to_purge.length > 0) {
                     $('.edit-control').each(function () {
                         $(this).find('button.btn-danger').toggleClass('btn-warning').toggleClass('btn-danger');
@@ -115,14 +117,14 @@
                     });
 
                     if (libraries_to_delete.length > 0) {
-                        $('#libraries-to-delete').prepend('<p>Are you REALLY sure you want to delete the following libraries:</p>');
+                        $('#libraries-to-delete').prepend('<p>Are you REALLY sure you want to delete the following libraries:</p>')
                         for (var i = 0; i < libraries_to_delete.length; i++) {
                             $('#libraries-to-delete').append('<li>' + $('div[data-id=' + libraries_to_delete[i] + ']').text() + '</li>');
                         }
                     }
 
                     if (libraries_to_purge.length > 0) {
-                        $('#libraries-to-purge').prepend('<p>Are you REALLY sure you want to purge all history for the following libraries:</p>');
+                        $('#libraries-to-purge').prepend('<p>Are you REALLY sure you want to purge all history for the following libraries:</p>')
                         for (var i = 0; i < libraries_to_purge.length; i++) {
                             $('#libraries-to-purge').append('<li>' + $('div[data-id=' + libraries_to_purge[i] + ']').text() + '</li>');
                         }
@@ -130,30 +132,33 @@
 
                     $('#confirm-modal-delete').modal();
                     $('#confirm-modal-delete').one('click', '#confirm-delete', function () {
-                        $.ajax({
-                            url: 'delete_all_library_history',
-                            type: 'POST',
-                            data: { row_ids: libraries_to_purge.join(',') },
-                            cache: false,
-                            async: true,
-                            success: function (data) {
-                                var msg = "Library history purged";
-                                showMsg(msg, false, true, 2000);
-                                libraries_list_table.draw();
-                            }
+                        libraries_to_delete.forEach(function(row, idx) {
+                            $.ajax({
+                                url: 'delete_library',
+                                type: 'POST',
+                                data: { library_id: row },
+                                cache: false,
+                                async: true,
+                                success: function (data) {
+                                    var msg = "Library deleted";
+                                    showMsg(msg, false, true, 2000);
+                                }
+                            });
                         });
-                        $.ajax({
-                            url: 'delete_library',
-                            type: 'POST',
-                            data: { row_ids: libraries_to_delete.join(',') },
-                            cache: false,
-                            async: true,
-                            success: function (data) {
-                                var msg = "Library deleted";
-                                showMsg(msg, false, true, 2000);
-                                libraries_list_table.draw();
-                            }
+                        libraries_to_purge.forEach(function(row, idx) {
+                            $.ajax({
+                                url: 'delete_all_library_history',
+                                type: 'POST',
+                                data: { library_id: row },
+                                cache: false,
+                                async: true,
+                                success: function (data) {
+                                    var msg = "Library history purged";
+                                    showMsg(msg, false, true, 2000);
+                                }
+                            });
                         });
+                        libraries_list_table.draw();
                     });
                 }
 
@@ -163,13 +168,6 @@
                 });
 
             } else {
-                $(this).tooltip({
-                    container: '.body-container',
-                    placement: 'bottom',
-                    title: 'Select libraries to delete/purge. Data is deleted/purged upon exiting edit mode.',
-                    trigger: 'manual'
-                }).tooltip('show');
-
                 libraries_to_delete = [];
                 libraries_to_purge = [];
                 $('.edit-control').each(function () {
@@ -184,14 +182,16 @@
     % if _session['user_group'] == 'admin':
     $("#refresh-libraries-list").click(function () {
         showMsg('Refreshing libraries list...', true, false);
+        $('#refresh-libraries-list > .fa-refresh').addClass('fa-spin');
         $.ajax({
             url: 'refresh_libraries_list',
             cache: false,
             async: true,
             complete: function (xhr, status) {
+                $('#refresh-libraries-list > .fa-refresh').removeClass('fa-spin');
                 var result = $.parseJSON(xhr.responseText);
                 var msg = result.message;
-                if (result.result === 'success') {
+                if (result.result == 'success') {
                     showMsg('<i class="fa fa-check"></i> ' + msg, false, true, 2000, false);
                     libraries_list_table.draw();
                 } else {

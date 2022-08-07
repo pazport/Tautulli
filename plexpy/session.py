@@ -1,6 +1,4 @@
-﻿# -*- coding: utf-8 -*-
-
-#  This file is part of Tautulli.
+﻿#  This file is part of Tautulli.
 #
 #  Tautulli is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -15,19 +13,11 @@
 #  You should have received a copy of the GNU General Public License
 #  along with Tautulli.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
-from future.builtins import str
-
 import cherrypy
 
 import plexpy
-if plexpy.PYTHON2:
-    import common
-    import users
-else:
-    from plexpy import common
-    from plexpy import users
-
+from plexpy import common
+from plexpy import users
 
 def get_session_info():
     """
@@ -36,6 +26,7 @@ def get_session_info():
     _session = {'user_id': None,
                 'user': None,
                 'user_group': 'admin',
+                'access_level': 9,
                 'exp': None}
 
     if isinstance(cherrypy.request.login, dict):
@@ -43,35 +34,36 @@ def get_session_info():
 
     return _session
 
+def get_session_user_group():
+    """
+    Returns the user_group for the current logged in session
+    """
+    _session = get_session_info()
+    return _session['user_group']
+
+def get_session_access_level():
+    """
+    Returns the user_group for the current logged in session
+    """
+    if get_session_user_group() == 'admin':
+        return 9
+
+    _session = get_session_info()
+    return _session['access_level']
+
 def get_session_user():
     """
     Returns the user_id for the current logged in session
     """
     _session = get_session_info()
-    return _session['user'] if _session['user_group'] == 'guest' and _session['user'] else None
+    return _session['user'] if _session['user_group'] != 'admin' and _session['user'] else None
 
 def get_session_user_id():
     """
     Returns the user_id for the current logged in session
     """
     _session = get_session_info()
-    return str(_session['user_id']) if _session['user_group'] == 'guest' and _session['user_id'] else None
-
-
-def get_session_user_token():
-    """
-    Returns the user's server_token for the current logged in session
-    """
-    _session = get_session_info()
-
-    if _session['user_group'] == 'guest' and _session['user_id']:
-        session_user_tokens = users.Users().get_tokens(_session['user_id'])
-        user_token = session_user_tokens['server_token']
-    else:
-        user_token = plexpy.CONFIG.PMS_TOKEN
-
-    return user_token
-
+    return str(_session['user_id']) if _session['user_group'] != 'admin' and _session['user_id'] else None
 
 def get_session_shared_libraries():
     """
@@ -79,6 +71,16 @@ def get_session_shared_libraries():
     """
     user_details = users.Users().get_details(user_id=get_session_user_id())
     return tuple(str(s) for s in user_details['shared_libraries'])
+
+def get_session_shared_servers():
+    """
+    Returns a tuple of server_ids for the current logged in session
+    """
+    if int(get_session_access_level()) >= 5:
+        return tuple(str(s) for s in plexpy.PMS_SERVERS.get_server_ids())
+
+    user_details = users.Users().get_details(user_id=get_session_user_id())
+    return tuple(str(s) for s in user_details['shared_servers'])
 
 def get_session_library_filters():
     """
@@ -119,18 +121,39 @@ def allow_session_user(user_id):
     """
     Returns True or False if the user_id is allowed for the current logged in session
     """
+    if int(get_session_access_level()) >= 3:
+        return True
+
     session_user_id = get_session_user_id()
     if session_user_id and str(user_id) != session_user_id:
         return False
+
     return True
 
 def allow_session_library(section_id):
     """
     Returns True or False if the section_id is allowed for the current logged in session
     """
+    if int(get_session_access_level()) >= 3:
+        return True
+
     session_library_ids = get_session_shared_libraries()
     if session_library_ids and str(section_id) not in session_library_ids:
         return False
+
+    return True
+
+def allow_session_server(server_id):
+    """
+    Returns True or False if the server_id is allowed for the current logged in session
+    """
+    if int(get_session_access_level()) >= 5:
+        return True
+
+    session_server_ids = get_session_shared_servers()
+    if session_server_ids and str(server_id) not in session_server_ids:
+        return False
+
     return True
 
 def friendly_name_to_username(list_of_dicts):
@@ -140,7 +163,7 @@ def friendly_name_to_username(list_of_dicts):
     session_user = get_session_user()
     session_user_id = get_session_user_id()
     
-    if session_user_id:
+    if session_user_id and int(get_session_access_level()) < 3:
         for d in list_of_dicts:
             if 'friendly_name' in d and d['friendly_name'] != session_user:
                 d['friendly_name'] = session_user
@@ -153,7 +176,7 @@ def filter_session_info(list_of_dicts, filter_key=None):
     """
     session_user_id = get_session_user_id()
     
-    if not session_user_id:
+    if not session_user_id or int(get_session_access_level()) >= 3:
         return list_of_dicts
 
     session_library_ids = get_session_shared_libraries()
@@ -204,7 +227,7 @@ def mask_session_info(list_of_dicts, mask_metadata=True):
     """
     session_user_id = get_session_user_id()
 
-    if not session_user_id:
+    if not session_user_id or int(get_session_access_level()) >= 3:
         return list_of_dicts
 
     session_user = get_session_user()
@@ -213,7 +236,6 @@ def mask_session_info(list_of_dicts, mask_metadata=True):
 
     keys_to_mask = {'user_id': '',
                     'user': 'Plex User',
-                    'username': 'Plex User',
                     'friendly_name': 'Plex User',
                     'user_thumb': common.DEFAULT_USER_THUMB,
                     'ip_address': 'N/A',

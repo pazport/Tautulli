@@ -31,24 +31,38 @@ DOCUMENTATION :: END
 </%doc>
 
 % if data != None:
-<%
-    from plexpy.helpers import cast_to_int, page, short_season
-%>
 % if data:
+% for server in data:
+<div class="row">
+    <div class="col-md-12">
+            <div class="button-bar pull-left">
+                <span class="btn btn-dark active" id="recently-added-xml-${server['server_id']}"  data-server_id="${server['server_id']}" style="cursor: default">${server['server_name']}</span>
+            </div>
+            <ul class="nav nav-header nav-dashboard pull-right" style="margin-top: -3px;">
+                <li>
+                    <a href="#" id="recently-added-page-left-${server['server_id']}" class="paginate btn-gray disabled" data-server_id="${server['server_id']}" data-id="+1"><i class="fa fa-lg fa-chevron-left"></i></a>
+                </li>
+                <li>
+                    <a href="#" id="recently-added-page-right-${server['server_id']}" class="paginate btn-gray disabled" data-server_id="${server['server_id']}" data-id="-1"><i class="fa fa-lg fa-chevron-right"></i></a>
+                </li>
+            </ul>
+    </div>
+</div>
+<hr>
 <div class="dashboard-recent-media-row">
-    <div id="recently-added-row-scroller" style="left: 0;">
+    <div id="recently-added-row-scroller-${server['server_id']}" data-server_id="${server['server_id']}" style="left: 0;">
         <ul class="dashboard-recent-media list-unstyled">
-            % for item in data:
+            % for item in server['items']:
             <div class="dashboard-recent-media-instance">
                 <li data-type="${item['media_type']}">
                     % if item['media_type'] == 'movie':
-                    <a href="${page('info', item['rating_key'])}" title="${item['title']}">
+                    <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['title']}">
                         <div class="dashboard-recent-media-poster">
-                            <div class="dashboard-recent-media-poster-face" style="background-image: url(${page('pms_image_proxy', item['thumb'], item['rating_key'], 300, 450, fallback='poster')});">
+                            <div class="dashboard-recent-media-poster-face" style="background-image: url(pms_image_proxy?server_id=${item['server_id']}&img=${item['thumb']}&width=300&height=450&fallback=poster);">
                                 <div class="dashboard-recent-media-overlay">
-                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['rating_key']}">
+                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['server_id']}-${item['rating_key']}">
                                         <script>
-                                            $('#added_at-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
+                                            $('#added_at-${item['server_id']}-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
                                         </script>
                                     </div>
                                 </div>
@@ -60,19 +74,19 @@ DOCUMENTATION :: END
                     </a>
                     <div class="dashboard-recent-media-metacontainer">
                         <h3>
-                            <a href="${page('info', item['rating_key'])}" title="${item['title']}">${item['title']}</a>
+                            <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['title']}">${item['title']}</a>
                         </h3>
                         <h3 class="text-muted">${item['year']}</h3>
                         <h3 class="text-muted">&nbsp;</h3>
                     </div>
                     % elif item['media_type'] == 'show':
-                    <a href="${page('info', item['rating_key'])}" title="${item['title']}">
+                    <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['title']}">
                         <div class="dashboard-recent-media-poster">
-                            <div class="dashboard-recent-media-poster-face" style="background-image: url(${page('pms_image_proxy', item['thumb'], item['rating_key'], 300, 450, fallback='poster')});">
+                            <div class="dashboard-recent-media-poster-face" style="background-image: url(pms_image_proxy?server_id=${item['server_id']}&img=${item['thumb']}&width=300&height=450&fallback=poster);">
                                 <div class="dashboard-recent-media-overlay">
-                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['rating_key']}">
+                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['server_id']}-${item['rating_key']}">
                                         <script>
-                                            $('#added_at-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
+                                            $('#added_at-${item['server_id']}-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
                                         </script>
                                     </div>
                                 </div>
@@ -84,25 +98,21 @@ DOCUMENTATION :: END
                     </a>
                     <div class="dashboard-recent-media-metacontainer">
                         <h3>
-                            <a href="${page('info', item['rating_key'])}" title="${item['title']}">${item['title']}</a>
+                            <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['title']}">${item['title']}</a>
                         </h3>
                         <h3 class="text-muted">
-                            ${item['child_count']} Season${'s' if cast_to_int(item['child_count']) > 1 else ''}
+                            ${item['child_count']} Seasons
                         </h3>
                         <h3 class="text-muted">&nbsp;</h3>
                     </div>
                     % elif item['media_type'] == 'season':
-                    <a href="${page('info', item['rating_key'])}" title="${item['parent_title']}">
+                    <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['parent_title']}">
                         <div class="dashboard-recent-media-poster">
-                            % if item['thumb']:
-                            <div class="dashboard-recent-media-poster-face" style="background-image: url(${page('pms_image_proxy', item['thumb'], item['rating_key'], 300, 450, fallback='poster')});">
-                            % else:
-                            <div class="dashboard-recent-media-poster-face" style="background-image: url(${page('pms_image_proxy', item['parent_thumb'], item['parent_rating_key'], 300, 450, fallback='poster')});">
-                            % endif
+                            <div class="dashboard-recent-media-poster-face" style="background-image: url(pms_image_proxy?server_id=${item['server_id']}&img=${item['thumb'] or item['parent_thumb']}&width=300&height=450&fallback=poster);">
                                 <div class="dashboard-recent-media-overlay">
-                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['rating_key']}">
+                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['server_id']}-${item['rating_key']}">
                                         <script>
-                                            $('#added_at-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
+                                            $('#added_at-${item['server_id']}-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
                                         </script>
                                     </div>
                                 </div>
@@ -114,21 +124,21 @@ DOCUMENTATION :: END
                     </a>
                     <div class="dashboard-recent-media-metacontainer">
                         <h3>
-                            <a href="${page('info', item['parent_rating_key'])}" title="${item['parent_title']}">${item['parent_title']}</a>
+                            <a href="info?server_id=${item['server_id']}&rating_key=${item['parent_rating_key']}" title="${item['parent_title']}">${item['parent_title']}</a>
                         </h3>
                         <h3 class="text-muted">
-                            <a class="text-muted" href="${page('info', item['rating_key'])}" title="${item['title']}">${item['title']}</a>
+                            <a class="text-muted" href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['title']}">${item['title']}</a>
                         </h3>
                         <h3 class="text-muted">&nbsp;</h3>
                     </div>
                     % elif item['media_type'] == 'episode':
-                    <a href="${page('info', item['rating_key'])}" title="${item['title']}">
+                    <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['title']}">
                         <div class="dashboard-recent-media-poster">
-                            <div class="dashboard-recent-media-poster-face" style="background-image: url(${page('pms_image_proxy', item['grandparent_thumb'], item['grandparent_rating_key'], 300, 450, fallback='poster')});">
+                            <div class="dashboard-recent-media-poster-face" style="background-image: url(pms_image_proxy?server_id=${item['server_id']}&img=${item['grandparent_thumb']}&width=300&height=450&fallback=poster);">
                                 <div class="dashboard-recent-media-overlay">
-                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['rating_key']}">
+                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['server_id']}-${item['rating_key']}">
                                         <script>
-                                            $('#added_at-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
+                                            $('#added_at-${item['server_id']}-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
                                         </script>
                                     </div>
                                 </div>
@@ -140,25 +150,25 @@ DOCUMENTATION :: END
                     </a>
                     <div class="dashboard-recent-media-metacontainer">
                         <h3>
-                            <a href="${page('info', item['grandparent_rating_key'])}" title="${item['grandparent_title']}">${item['grandparent_title']}</a>
+                            <a href="info?server_id=${item['server_id']}&rating_key=${item['grandparent_rating_key']}" title="${item['grandparent_title']}">${item['grandparent_title']}</a>
                         </h3>
                         <h3 class="text-muted">
-                            <a href="${page('info', item['rating_key'])}" title="${item['title']}">${item['title']}</a>
+                            <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['title']}">${item['title']}</a>
                         </h3>
                         <h3 class="text-muted">
-                            <a href="${page('info', item['parent_rating_key'])}" title="${item['parent_title']}">${short_season(item['parent_title'])}</a>
+                            <a href="info?server_id=${item['server_id']}&rating_key=${item['parent_rating_key']}" title="Season ${item['parent_media_index']}">S${item['parent_media_index']}</a>
                             &middot;
-                            <a href="${page('info', item['rating_key'])}" title="Episode ${item['media_index']}">E${item['media_index']}</a>
+                            <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="Episode ${item['media_index']}">E${item['media_index']}</a>
                         </h3>
                     </div>
-                    % elif item['media_type'] == 'album':
-                    <a href="${page('info', item['rating_key'])}" title="${item['parent_title']}">
+				    % elif item['media_type'] == 'album':
+                    <a href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['parent_title']}">
                         <div class="dashboard-recent-media-cover">
-                            <div class="dashboard-recent-media-cover-face" style="background-image: url(${page('pms_image_proxy', item['thumb'], item['rating_key'], 300, 300, fallback='cover')});">
+                            <div class="dashboard-recent-media-cover-face" style="background-image: url(pms_image_proxy?server_id=${item['server_id']}&img=${item['thumb']}&width=300&height=300&fallback=cover);">
                                 <div class="dashboard-recent-media-overlay">
-                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['rating_key']}">
+                                    <div class="dashboard-recent-media-overlay-text" id="added_at-${item['server_id']}-${item['rating_key']}">
                                         <script>
-                                            $('#added_at-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
+                                            $('#added_at-${item['server_id']}-${item['rating_key']}').text('Added ' + moment(${item['added_at']}, "X").fromNow())
                                         </script>
                                     </div>
                                 </div>
@@ -170,23 +180,30 @@ DOCUMENTATION :: END
                     </a>
                     <div class="dashboard-recent-media-metacontainer">
                         <h3>
-                            <a href="${page('info', item['parent_rating_key'])}" title="${item['parent_title']}">${item['parent_title']}</a>
+                            <a href="info?server_id=${item['server_id']}&rating_key=${item['parent_rating_key']}" title="${item['parent_title']}">${item['parent_title']}</a>
                         </h3>
                         <h3 class="text-muted">
-                            <a class="text-muted" href="${page('info', item['rating_key'])}" title="${item['title']}">${item['title']}</a>
+                            <a class="text-muted" href="info?server_id=${item['server_id']}&rating_key=${item['rating_key']}" title="${item['title']}">${item['title']}</a>
                         </h3>
                         <h3 class="text-muted">&nbsp;</h3>
                     </div>
-                    % endif
+				    % endif
                 </li>
             </div>
             % endfor
         </ul>
     </div>
 </div>
+% endfor
 % else:
 <div id="dashboard-no-recently-added" class="text-muted" style="height: 288px; margin-bottom: 25px;">No recently added items.</div>
 % endif
 % else:
-<div class="text-muted">There was an error communicating with your Plex Server.</div><br>
+<div class="text-muted">No plex servers are enabled or online.</div><br>
 % endif
+<script>
+    $("[id^='recently-added-xml-']").on('tripleclick', function () {
+        var server_id = parseInt($(this).data('server_id'));
+        openPlexXML('/library/recentlyAdded', false, server_id, {'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': recently_added_count});
+    });
+</script>
